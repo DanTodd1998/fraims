@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "assessmentType": "Type 1",
+    "propertyName": "38-40 Gloucester Terrace",
+    "propertyReference": "F-AP-038",
+    "propertyAddress": "W2 3DA",
+    "producedFor": "Ash Ponsonby",
+    "scope": "Assessment applies only to the building specified.",
+    "assessmentDate": "2026-07-07",
+    "validityMonths": 12,
+    "approvedDate": "2026-07-10",
+    "versionRef": "F-AP-038-V2.0",
+    "assessor": {
+      "name": "Daniel Todd",
+      "title": "Health & Safety / Fire Risk Assessor",
+      "qualifications": ["FDIS scheme", "National General Certificate in Occupational Health and Safety"],
+      "organisation": "London & Kent Construction Ltd"
+    },
+    "specification": {
+      "conformance": "Internal Quality System",
+      "methodology": "PAS 79-1:2020 (Fire Risk Assessment \u2013 Premises)",
+      "inspectionType": "Visual, non-invasive"
+    },
+    "approval": {
+      "assessedBy": "Daniel Todd",
+      "approvedBy": "",
+      "approvedAt": ""
+    }
+  },
+  "report": {
+    "buildingOverview": [
+      "38\u201340 Gloucester Terrace comprises a pair of adjoining mid-19th century stucco-fronted townhouses forming part of a long terrace located within the Bayswater area of Westminster, just north of Hyde Park. The properties are of traditional solid brick masonry construction with rendered fa\u00e7ades and classical detailing, consistent with the surrounding historic housing stock along Gloucester Terrace.",
+      "The buildings are arranged over four storeys above ground, together with lower ground floor levels. The roofs are pitched and concealed behind parapet walls, in keeping with the uniform architectural style of the terrace. The external walls are of solid brick construction finished with stucco render and decorative mouldings to the principal elevation. Internally, the buildings have been converted to provide fourteen self-contained residential flats across eleven occupiable floor levels.",
+      "Access is via shared principal entrances at street level, leading to common stairwells which provide vertical circulation to all floors. A single staircase serves each building, and one passenger lift is provided. The means of escape for residents is via the central stairwells, discharging at ground-floor level to the main entrances onto Gloucester Terrace. No secondary means of escape was observed."
+    ],
+    "sections": [
+      { "key": "occupancy", "title": "Occupancy & Vulnerable Groups", "findings": "The building accommodates an estimated 31\u201340 residents on a regular basis. No information was available at the time of inspection regarding residents belonging to vulnerable groups, and no specific evacuation assistance arrangements were identified. The responsible person should maintain awareness of the occupancy profile as part of ongoing fire safety management." },
+      { "key": "management", "title": "Fire Risk Management & Evacuation Strategy", "findings": "A written fire safety policy is in place, covering guidance for residents, staff, and contractors, and remedial works are managed by competent persons. The evacuation strategy currently adopted is full simultaneous evacuation, considered appropriate given the detection and alarm arrangements provided. Fire action notices are displayed within the common parts. The most recent fire risk assessment was undertaken in 2026.", "appendixRef": "C" },
+      { "key": "escape", "title": "Means of Escape", "findings": "The primary escape route comprises the single central staircase within each building, discharging directly to street level. At the time of inspection, all escape routes were observed to be clear and unobstructed, and the number and placement of exits were considered adequate. Fire exit doors functioned correctly, including self-closing mechanisms, and doors and partitions separating escape routes from risk areas were assessed as adequate in terms of fire resistance." },
+      { "key": "detection", "title": "Fire Detection & Alarm Systems", "findings": "An interlinked fire detection and alarm system is installed within the common parts, with manual call points and sounders provided at appropriate locations. Alarms were considered audible in all relevant areas. The system was most recently tested in January 2026, and the current test certificate is appended. The system does not integrate with external emergency responders, which is not a requirement for premises of this type.", "appendixRef": "D" },
+      { "key": "firefighting", "title": "Fire-Fighting Equipment", "findings": "No portable fire-fighting equipment is provided within the common parts. This is consistent with recognised sector guidance for residential blocks, which notes that portable extinguishers in communal areas of general-needs housing are not normally expected, as residents are not trained in their use and the priority in the event of fire is evacuation." },
+      { "key": "lighting", "title": "Emergency Lighting", "findings": "Emergency lighting is installed throughout the escape routes, staircases, and critical communal areas, with luminaires observed to be in place and energised at the time of inspection. Current test certification is appended, demonstrating that the system has been inspected and maintained in accordance with BS 5266.", "appendixRef": "F" },
+      { "key": "signage", "title": "Signage", "findings": "Fire exit signage is present, clearly visible, and appropriately positioned to guide occupants towards the escape routes. No missing, unclear, or damaged signs were identified, and the signage provision aligns with recognised fire safety guidance, including the principles of Approved Document B.", "appendixRef": "G" },
+      { "key": "electrical", "title": "Electrical Safety", "findings": "The communal electrical intake and distribution equipment is located within a dedicated cupboard. A current Electrical Installation Condition Report (EICR) for the communal installation is appended, demonstrating that the fixed electrical installation has been inspected and tested by a suitably qualified person. Electrical intake areas should continue to be kept free of storage and combustible materials." },
+      { "key": "hvac", "title": "Heating, Ventilation & Gas Safety", "findings": "Gas equipment serving the premises is maintained and serviced in accordance with safety regulations. No centralised heating or ventilation plant is provided within the common parts, and no visible defects or fire hazards were identified in relation to building services." },
+      { "key": "security", "title": "Security & Access", "findings": "Security measures within the building were not observed to hinder evacuation. No keypads, locked doors, or other access arrangements were identified that could delay escape or increase risk to occupants." },
+      { "key": "housekeeping", "title": "Housekeeping & Storage", "findings": "Communal areas and escape routes were observed to be free from combustible materials, clutter, and obstructions. Communal cupboards and store rooms were well kept and free of flammable or dangerous materials. A continued good standard of housekeeping should be maintained as a primary control measure." },
+      { "key": "drills", "title": "Fire Drills & Training", "findings": "Fire drills are not required in this long-term residential property; occupants are familiar with the single means of escape. There are no staff based at the premises requiring fire safety training." },
+      { "key": "compliance", "title": "Compliance & Certification", "findings": "Records are maintained for fire risk assessments, inspections, servicing, and maintenance, and were considered accessible and complete. Supporting certification is appended. There were no outstanding actions carried forward from the previous assessment, and no previous fire incidents or near misses were reported." }
+    ]
+  },
+  "riskEvaluation": {
+    "likelihood": "Low",
+    "consequence": "Moderate",
+    "likelihoodNarrative": "The premises are in residential use only, with no commercial units, no significant ignition sources within the common parts, a good standard of housekeeping, and maintained building services supported by current certification.",
+    "consequenceNarrative": "As a converted residential building served by a single staircase, a fire within the common parts could expose occupants to smoke on the escape route; however, this is mitigated by the interlinked detection and alarm system, emergency lighting, clear escape routes, and the compartmentation provided by fire-resisting door sets.",
+    "ratingNarrative": "A Tolerable risk rating indicates that no major additional physical fire protection measures are required. Fire safety at the premises should be maintained through the continuation of existing management arrangements, routine testing and servicing of life safety systems, and ongoing monitoring and review as set out in Section 6."
+  },
+  "certification": {
+    "intro": "The following current certification is appended to this report in support of the findings set out above:",
+    "items": [
+      "Electrical Installation Condition Report (EICR) \u2014 S&M Electrical Ltd, inspected 21/03/2023, overall assessment Satisfactory, next inspection due before 21/03/2028 (Cert. No. ILBA-000113-1-EICR).",
+      "Fire Alarm & Emergency Lighting Test Certificate \u2014 West One Fire Protection, tested 16/01/2026 in accordance with BS 5839 (Fire Alarms) and BS 5266 (Emergency Lighting); system left in full working order."
+    ]
+  },
+  "appendices": [
+    { "ref": "A", "title": "Exterior Photograph", "layout": "single", "photos": [ { "file": "exterior/exterior_01.jpg", "caption": "Principal elevation \u2014 full building height" } ] },
+    { "ref": "B", "title": "Staircases", "layout": "grid", "photos": [
+      { "file": "staircases/stair_01.jpg", "caption": "Staircase 1" },
+      { "file": "staircases/stair_02.jpg", "caption": "Staircase 2" },
+      { "file": "staircases/stair_03.jpg", "caption": "Staircase 3" }
+    ] },
+    { "ref": "C", "title": "Fire Risk Management", "layout": "grid", "photos": [
+      { "file": "management/mgmt_01.jpg", "caption": "Fire action notice / management documentation" }
+    ] },
+    { "ref": "D", "title": "Fire Detection & Alarm", "layout": "grid", "photos": [
+      { "file": "detection/det_01.jpg", "caption": "Detection/Alarm 1" },
+      { "file": "detection/det_02.jpg", "caption": "Detection/Alarm 2" }
+    ] },
+    { "ref": "F", "title": "Emergency Lighting", "layout": "grid", "photos": [
+      { "file": "lighting/light_01.jpg", "caption": "Emergency light 1" },
+      { "file": "lighting/light_02.jpg", "caption": "Emergency light 2" }
+    ] },
+    { "ref": "G", "title": "Signage", "layout": "grid", "photos": [
+      { "file": "signage/sign_01.jpg", "caption": "Signage 1" }
+    ] }
+  ]
+}

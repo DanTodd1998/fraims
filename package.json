@@ -1,0 +1,16 @@
+{
+  "name": "fra-generator",
+  "version": "1.0.0",
+  "description": "London & Kent FRA PDF generator (Gloucester narrative format)",
+  "main": "index.js",
+  "scripts": {
+    "generate": "node src/generate.js",
+    "draft": "node src/aiDraft.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pdfmake": "^0.2.7"
+  }
+}
