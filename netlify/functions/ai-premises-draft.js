@@ -45,13 +45,33 @@ exports.handler = async (event) => {
   const prompt = `
 You are assisting a competent fire risk assessor in the United Kingdom.
 
-Using only the structured information below, draft one concise professional
-"Premises Description" paragraph for a Fire Risk Assessment.
+Using only the structured assessment information below, draft the PREM-01
+"Premises description" finding.
 
-Do not invent facts.
-Do not make compliance conclusions.
-Clearly state where information is unknown.
-Return only the paragraph.
+Return valid JSON only, with exactly these fields:
+
+{
+  "finding": "",
+  "existingControls": "",
+  "recommendation": "",
+  "priority": "",
+  "responsibleParty": "",
+  "limitations": ""
+}
+
+Rules:
+
+- Do not invent facts.
+- Do not make a final compliance judgement.
+- Use concise, professional FRA wording.
+- "finding" should describe the premises using the known information.
+- "existingControls" should include only controls clearly recorded in the assessment.
+- "recommendation" should identify missing information or sensible follow-up action.
+- "priority" must be one of:
+  "", "immediate", "high", "medium", "low", "advisory"
+- "responsibleParty" should be blank unless the assessment clearly supports one.
+- "limitations" should clearly record unknown, unclear, or missing information.
+- Return JSON only. No markdown and no explanation.
 
 Assessment information:
 ${JSON.stringify(assessment, null, 2)}
@@ -90,16 +110,34 @@ ${JSON.stringify(assessment, null, 2)}
       };
     }
 
-    const text = (data.content || [])
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
+   const text = (data.content || [])
+  .filter((block) => block.type === "text")
+  .map((block) => block.text)
+  .join("\n")
+  .trim();
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    };
+let draft;
+
+try {
+  draft = JSON.parse(text);
+} catch (error) {
+  console.error("Claude returned invalid JSON:", text);
+
+  return {
+    statusCode: 502,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      error: "AI returned an invalid structured response",
+      raw: text
+    }),
+  };
+}
+
+return {
+  statusCode: 200,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ draft }),
+};
   } catch (error) {
     console.error("Anthropic request failed:", error);
 
