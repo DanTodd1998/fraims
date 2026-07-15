@@ -6,12 +6,21 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const PHOTO_BUCKET = "assessment-photos";
 
 const PHOTO_CATEGORIES = [
-  { ref: "A", key: "exterior",  title: "Exterior" },
-  { ref: "B", key: "staircases", title: "Staircases" },
-  { ref: "C", key: "management", title: "Fire Management" },
-  { ref: "D", key: "detection",  title: "Detection & Alarm" },
-  { ref: "F", key: "lighting",   title: "Emergency Lighting" },
-  { ref: "G", key: "signage",    title: "Signage" }
+  { ref: "A", key: "exterior", title: "Exterior & Fire Service Access" },
+  { ref: "B", key: "escape_routes", title: "Means of Escape & Staircases" },
+  { ref: "C", key: "management", title: "Fire Safety Management" },
+  { ref: "D", key: "detection", title: "Fire Detection & Alarm" },
+  { ref: "E", key: "fire_doors", title: "Fire Doors" },
+  { ref: "F", key: "lighting", title: "Emergency Lighting" },
+  { ref: "G", key: "signage", title: "Fire Safety Signage" },
+  { ref: "H", key: "firefighting_equipment", title: "Firefighting Equipment" },
+  { ref: "I", key: "compartmentation", title: "Compartmentation & Fire-Stopping" },
+  { ref: "J", key: "electrical", title: "Electrical & Ignition Hazards" },
+  { ref: "K", key: "heating_cooking", title: "Heating & Cooking Hazards" },
+  { ref: "L", key: "housekeeping", title: "Combustibles & Housekeeping" },
+  { ref: "M", key: "smoke_control", title: "Smoke Control" },
+  { ref: "N", key: "firefighter_facilities", title: "Firefighter Facilities" },
+  { ref: "O", key: "other", title: "Other Relevant Evidence" }
 ];
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
