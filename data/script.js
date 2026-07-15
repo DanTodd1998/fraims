@@ -269,8 +269,21 @@ async function showAssessmentWorkspace() {
         <p>Record hazards, controls and significant findings.</p>
       </button>
     </section>
-    <button class="action-button action-button-secondary" onclick="showDashboard()">Back to Dashboard</button>
-  `;
+<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+
+  <button
+    class="action-button action-button-primary"
+    onclick="generateDraftFRA()">
+    ✨ Generate Draft FRA
+  </button>
+
+  <button
+    class="action-button action-button-secondary"
+    onclick="showDashboard()">
+    Back to Dashboard
+  </button>
+
+</div>  `;
 }
 
 function showDashboard() { location.reload(); }
@@ -734,7 +747,38 @@ async function generatePremisesDraft() {
     alert("Could not contact AI.");
   }
 }
+async function generateDraftFRA() {
+  const assessment = await Store.loadCurrent();
 
+  if (!assessment) {
+    alert("No assessment loaded.");
+    return;
+  }
+
+  console.log("Assessment being sent to AI:", assessment);
+
+  try {
+    const response = await fetch("/.netlify/functions/generate-fra", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        assessment
+      })
+    });
+
+    const result = await response.json();
+
+    console.log("Generate FRA response:", result);
+
+    alert(result.message || result.error || "Unknown response");
+
+  } catch (err) {
+    console.error("Generate Draft FRA failed:", err);
+    alert("Could not contact the AI generator.");
+  }
+}
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
