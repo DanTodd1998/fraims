@@ -492,6 +492,7 @@ async function showFireRiskFindings() {
   if (!assessment || !assessment.id) { alert("Please create and save an assessment first."); showDashboard(); return; }
   if (!assessment.findings) assessment.findings = {};
   FRF.assessment = assessment;
+  console.log("Current FRA assessment for AI:", assessment);
   renderSectionList();
 }
 
