@@ -544,8 +544,7 @@ function openFindingSection(encodedName) {
       ? `<div class="photo-link-list">` + photos.map((p) => {
           const sel = (f.linkedPhotos || []).includes(p.ref) ? " selected" : "";
           const tick = sel ? `<span class="tick">✓</span>` : "";
-          return `<div class="photo-link${sel}" onclick="toggleLinkedPhoto('${q.id}','${p.ref}')">
-                    <img src="${escapeHtml(p.url)}" alt="${escapeHtml(p.label)}">${tick}
+return `<div class="photo-link${sel}" onclick="toggleLinkedPhoto(this,'${q.id}','${p.ref}')">                    <img src="${escapeHtml(p.url)}" alt="${escapeHtml(p.label)}">${tick}
                   </div>`;
         }).join("") + `</div>`
       : `<p class="photo-empty">No photographs uploaded yet. Add them in the Photographs section to link here.</p>`;
@@ -638,16 +637,27 @@ function updateFinding(questionId, field, value) {
   scheduleFindingSave();
 }
 
-function toggleLinkedPhoto(questionId, ref) {
+function toggleLinkedPhoto(el, questionId, ref) {
   if (!FRF.assessment.findings[questionId]) FRF.assessment.findings[questionId] = blankFinding();
   const arr = FRF.assessment.findings[questionId].linkedPhotos || [];
   const idx = arr.indexOf(ref);
   if (idx === -1) arr.push(ref); else arr.splice(idx, 1);
   FRF.assessment.findings[questionId].linkedPhotos = arr;
-  // Reflect selection immediately without a full re-render
-  const el = event.currentTarget;
-  if (idx === -1) { el.classList.add("selected"); if (!el.querySelector(".tick")) { const t=document.createElement("span"); t.className="tick"; t.textContent="✓"; el.appendChild(t);} }
-  else { el.classList.remove("selected"); const t=el.querySelector(".tick"); if (t) t.remove(); }
+  // Reflect selection immediately without a full re-render.
+  // `el` is the clicked .photo-link element, passed in explicitly (no global event).
+  if (idx === -1) {
+    el.classList.add("selected");
+    if (!el.querySelector(".tick")) {
+      const t = document.createElement("span");
+      t.className = "tick";
+      t.textContent = "✓";
+      el.appendChild(t);
+    }
+  } else {
+    el.classList.remove("selected");
+    const t = el.querySelector(".tick");
+    if (t) t.remove();
+  }
   scheduleFindingSave();
 }
 
