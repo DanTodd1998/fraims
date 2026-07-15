@@ -545,13 +545,16 @@ function openFindingSection(encodedName) {
       ? `<div class="photo-link-list">` + photos.map((p) => {
           const sel = (f.linkedPhotos || []).includes(p.ref) ? " selected" : "";
           const tick = sel ? `<span class="tick">✓</span>` : "";
-return `<div class="photo-link${sel}" onclick="toggleLinkedPhoto(this,'${q.id}','${p.ref}')">                    <img src="${escapeHtml(p.url)}" alt="${escapeHtml(p.label)}">${tick}
-                  </div>`;
+          return `<div class="photo-link${sel}" onclick="toggleLinkedPhoto(this,'${q.id}','${p.ref}')"><img src="${escapeHtml(p.url)}" alt="${escapeHtml(p.label)}">${tick}</div>`;
         }).join("") + `</div>`
       : `<p class="photo-empty">No photographs uploaded yet. Add them in the Photographs section to link here.</p>`;
 
     const suggested = q.suggestedPriority
       ? `<div class="suggested-hint">Suggested — assessor review required: ${escapeHtml(q.suggestedPriority)}</div>`
+      : ``;
+
+    const aiButton = q.id === "PREM-01"
+      ? `<button type="button" class="action-button action-button-primary" style="float:right;padding:6px 12px;font-size:0.85rem" onclick="generatePremisesDraft()">✨ Generate with AI</button>`
       : ``;
 
     return `
@@ -587,8 +590,13 @@ return `<div class="photo-link${sel}" onclick="toggleLinkedPhoto(this,'${q.id}',
           </div>
         </div>
 
-        <div class="form-group"><label>Finding / observation</label>
-          <textarea oninput="updateFinding('${q.id}','finding',this.value)">${escapeHtml(f.finding)}</textarea></div>
+        <div class="form-group">
+          <label>
+            Finding / observation
+            ${aiButton}
+          </label>
+          <textarea id="finding-${q.id}" oninput="updateFinding('${q.id}','finding',this.value)">${escapeHtml(f.finding)}</textarea>
+        </div>
         <div class="form-group"><label>Existing controls</label>
           <textarea oninput="updateFinding('${q.id}','existingControls',this.value)">${escapeHtml(f.existingControls)}</textarea></div>
         <div class="form-group"><label>Recommendation</label>
@@ -681,6 +689,40 @@ async function commitFindingSave() {
   } catch (err) {
     console.error("Findings save failed:", err);
     if (ind) { ind.textContent = "Save failed — check connection. Your edits are kept on screen."; ind.className = "save-indicator error"; }
+  }
+}
+
+async function generatePremisesDraft() {
+  try {
+    const response = await fetch("/.netlify/functions/ai-premises-draft", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        assessment: FRF.assessment
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      console.error("AI generation failed:", result);
+      alert(result.error || "AI generation failed.");
+      return;
+    }
+    const textarea = document.getElementById("finding-PREM-01");
+    if (!textarea) {
+      alert("Premises textarea not found.");
+      return;
+    }
+    textarea.value = result.text || "";
+    updateFinding(
+      "PREM-01",
+      "finding",
+      result.text || ""
+    );
+  } catch (err) {
+    console.error("Could not contact AI:", err);
+    alert("Could not contact AI.");
   }
 }
 
