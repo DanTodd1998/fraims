@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>FRAIMS</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="header">
+    <h1>FRAIMS</h1>
+    <p>Fire Risk Assessment Information Management System</p>
+  </header>
+
+  <main class="container">
+
+    <section class="welcome">
+      <h2>Assessment Dashboard</h2>
+      <p>Create, review and manage Fire Risk Assessments for London & Kent Construction.</p>
+    </section>
+
+    <section class="dashboard-grid">
+
+      <button class="dashboard-card primary-card" onclick="startNewAssessment()">
+        <div class="icon">➕</div>
+        <h3>New Fire Risk Assessment</h3>
+        <p>Start a new assessment and enter the property details.</p>
+      </button>
+
+      <button class="dashboard-card" onclick="showDraftAssessments()">
+        <div class="icon">📝</div>
+        <h3>Draft Assessments</h3>
+        <p>Continue assessments that have not yet been approved.</p>
+      </button>
+
+      <button class="dashboard-card" onclick="showCompletedAssessments()">
+        <div class="icon">✅</div>
+        <h3>Completed Assessments</h3>
+        <p>View approved assessments and generated PDF reports.</p>
+      </button>
+
+    </section>
+
+  </main>
+
+  <!-- Supabase client (loaded before script.js so it's available globally) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f3f5f7;
+  color: #1f2933;
+}
+
+.header {
+  background: #123b5d;
+  color: white;
+  padding: 22px 28px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.header p {
+  margin: 6px 0 0;
+  opacity: 0.9;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.welcome {
+  background: white;
+  border-radius: 12px;
+  padding: 26px;
+  margin-bottom: 24px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.welcome h2 {
+  margin-top: 0;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.dashboard-card {
+  background: white;
+  border: none;
+  border-radius: 12px;
+  min-height: 190px;
+  padding: 26px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font: inherit;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-card .icon {
+  font-size: 38px;
+  margin-bottom: 18px;
+}
+
+.dashboard-card h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  color: #123b5d;
+}
+
+.dashboard-card p {
+  margin: 0;
+  line-height: 1.5;
+  color: #52606d;
+}
+
+.primary-card {
+  background: #123b5d;
+  color: white;
+}
+
+.primary-card h3,
+.primary-card p {
+  color: white;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: bold;
+  color: #243b53;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5df;
+  border-radius: 8px;
+  font: inherit;
+  background: white;
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #2684b8;
+  box-shadow: 0 0 0 3px rgba(38, 132, 184, 0.15);
+}
+
+.action-button {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.action-button-primary {
+  background: #123b5d;
+  color: white;
+}
+
+.action-button-secondary {
+  background: #e8edf2;
+  color: #1f2933;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #705c00;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .container {
+    margin-top: 24px;
+  }
+
+  .header {
+    padding: 18px 20px;
+  }
+}
+
+/* ---------- Photographs module ---------- */
+.photo-category {
+  margin-bottom: 22px;
+}
+
+.photo-category h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: #123b5d;
+}
+
+.photo-upload-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.photo-upload-row input[type="file"] {
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+
+.photo-upload-row button {
+  width: auto;
+  margin-top: 0;
+  padding: 12px 18px;
+  white-space: nowrap;
+}
+
+.photo-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.photo-thumb {
+  position: relative;
+  border: 1px solid #cbd5df;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f3f5f7;
+}
+
+.photo-thumb img {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+}
+
+.photo-thumb .remove-photo {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(18, 59, 93, 0.85);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.photo-empty {
+  color: #7b8794;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.upload-status {
+  font-size: 13px;
+  color: #52606d;
+  margin: 6px 0 0;
+  min-height: 18px;
+}
+
+.upload-status.error { color: #b42318; }
+.upload-status.success { color: #027a48; }
