@@ -540,33 +540,6 @@ function renderSectionList() {
   }).join("");
 
   document.querySelector(".container").innerHTML = `
-  <section class="section-status-card">
-  <h3>${escapeHtml(sectionName)}</h3>
-
-  <div class="status-buttons">
-    <button
-      class="action-button ${sectionState.status === "applicable" ? "" : "action-button-secondary"}"
-      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','applicable')">
-      ✅ Applicable
-    </button>
-
-    <button
-      class="action-button ${sectionState.status === "na" ? "" : "action-button-secondary"}"
-      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','na')">
-      🚫 N/A
-    </button>
-  </div>
-
-  ${
-    sectionState.status === "na"
-      ? `
-        <textarea
-          id="naReason"
-          placeholder="Reason this section is not applicable...">${escapeHtml(sectionState.reason || "")}</textarea>
-      `
-      : ""
-  }
-</section>
     <section class="welcome">
       <h2>Fire Risk Findings</h2>
       <p>${escapeHtml(FRF.assessment.propertyName || "")} — universal core assessment. Select a section to record findings.</p>
