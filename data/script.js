@@ -583,7 +583,7 @@ function openFindingSection(encodedName) {
   const qs = UNIVERSAL_CORE.filter((q) => q.section === sectionName);
   const findings = FRF.assessment.findings || {};
   const photos = allPhotos(FRF.assessment);
-const sectionState =
+  const sectionState =
   FRF.assessment.findings?.sectionStates?.[sectionName] || {
     status: "applicable",
     reason: ""
