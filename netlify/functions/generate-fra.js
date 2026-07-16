@@ -142,7 +142,7 @@ const response = await fetch("https://api.anthropic.com/v1/messages", {
   },
   body: JSON.stringify({
     model: "claude-sonnet-5",
-    max_tokens: 8000,
+    max_tokens: 3500,
     messages: [
       {
         role: "user",
