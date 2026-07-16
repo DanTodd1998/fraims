@@ -52,12 +52,156 @@ Return structured JSON only. Do not include markdown.
     // - Send to Claude
     // - Return complete draft FRA
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: "System prompt loaded successfully.",
-      }),
-    };
+    // Gather every uploaded photograph from every category.
+const photoContent = [];
+
+Object.entries(assessment.photos || {}).forEach(([category, photos]) => {
+  (photos || []).forEach((photo, index) => {
+    if (!photo.url) return;
+
+    photoContent.push({
+      type: "text",
+      text: `Photograph ${category.toUpperCase()}-${String(index + 1).padStart(3, "0")}
+Category: ${category}
+Original filename: ${photo.name || "Unknown"}`,
+    });
+
+    photoContent.push({
+      type: "image",
+      source: {
+        type: "url",
+        url: photo.url,
+      },
+    });
+  });
+});
+
+const reportRequest = `
+${systemPrompt}
+
+Using the complete assessment information and every photograph supplied,
+produce a full draft Fire Risk Assessment for assessor review.
+
+Return valid JSON only, using exactly this structure:
+
+{
+  "scopeResponsiblePersons": "",
+  "premisesOccupancy": "",
+  "fireHazards": "",
+  "meansOfEscape": "",
+  "fireDetectionWarning": "",
+  "emergencyLightingSignage": "",
+  "firefightingEquipment": "",
+  "passiveFireProtection": "",
+  "firefighterAccessFacilities": "",
+  "managementTestingRecords": "",
+  "conclusions": "",
+  "recommendations": [
+    {
+      "action": "",
+      "priority": "",
+      "responsibleParty": "",
+      "targetDate": "",
+      "photoReferences": []
+    }
+  ],
+  "limitations": "",
+  "photoAppendix": [
+    {
+      "photoId": "",
+      "category": "",
+      "caption": "",
+      "observation": ""
+    }
+  ]
+}
+
+Requirements:
+
+- Draft the entire assessment, not one question or one section.
+- Use all available property details, building details, findings and photographs.
+- Do not invent facts that are not present or visibly supported.
+- Clearly identify missing or uncertain information.
+- Refer to photographs using the supplied photograph IDs.
+- Include every uploaded photograph in photoAppendix.
+- Keep the main report professional and readable.
+- Keep all output editable by the assessor.
+- Return JSON only, with no markdown or explanatory text.
+
+Complete assessment information:
+
+${JSON.stringify(assessment, null, 2)}
+`.trim();
+
+const response = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-5",
+    max_tokens: 8000,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: reportRequest,
+          },
+          ...photoContent,
+        ],
+      },
+    ],
+  }),
+});
+
+const data = await response.json();
+
+if (!response.ok) {
+  return {
+    statusCode: response.status,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      error: "Anthropic API error",
+      detail: data,
+    }),
+  };
+}
+
+const text = (data.content || [])
+  .filter((block) => block.type === "text")
+  .map((block) => block.text)
+  .join("\n")
+  .trim();
+
+let draft;
+
+try {
+  draft = JSON.parse(text);
+} catch (parseError) {
+  console.error("Claude returned invalid JSON:", text);
+
+  return {
+    statusCode: 502,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      error: "Claude returned an invalid report format.",
+      raw: text,
+    }),
+  };
+}
+
+return {
+  statusCode: 200,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    draft,
+    photoCount: photoContent.filter((item) => item.type === "image").length,
+  }),
+};
 
   } catch (error) {
     return {
