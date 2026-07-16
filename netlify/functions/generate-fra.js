@@ -28,10 +28,21 @@ exports.handler = async (event) => {
       };
     }
 
-    const systemPrompt = fs.readFileSync(
-      path.join(process.cwd(), "prompts", "fra-system-prompt.txt"),
-      "utf8"
-    );
+    const systemPrompt = `
+You are an expert United Kingdom Fire Risk Assessor.
+
+Draft a complete Fire Risk Assessment using the supplied assessment information and all uploaded photographs.
+
+The assessor remains responsible for reviewing, editing and approving the final report.
+
+Do not invent facts. Clearly identify missing or uncertain information.
+
+Use professional UK fire-risk-assessment terminology and PAS 79 methodology.
+
+Analyse all photographs together with the property details and assessment information.
+
+Return structured JSON only. Do not include markdown.
+`.trim();
 
     // NEXT:
     // - Build one prompt from:
