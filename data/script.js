@@ -738,7 +738,7 @@ function openFindingSection(encodedName) {
           <textarea oninput="updateFinding('${q.id}','existingControls',this.value)">${escapeHtml(f.existingControls)}</textarea></div>
         <div class="form-group"><label>Recommendation</label>
           <textarea oninput="updateFinding('${q.id}','recommendation',this.value)">${escapeHtml(f.recommendation)}</textarea></div>
-
+</div>
         <div class="field-row">
           <div class="form-group">
             <label>Priority</label>
