@@ -540,6 +540,33 @@ function renderSectionList() {
   }).join("");
 
   document.querySelector(".container").innerHTML = `
+  <section class="section-status-card">
+  <h3>${escapeHtml(sectionName)}</h3>
+
+  <div class="status-buttons">
+    <button
+      class="action-button ${sectionState.status === "applicable" ? "" : "action-button-secondary"}"
+      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','applicable')">
+      ✅ Applicable
+    </button>
+
+    <button
+      class="action-button ${sectionState.status === "na" ? "" : "action-button-secondary"}"
+      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','na')">
+      🚫 N/A
+    </button>
+  </div>
+
+  ${
+    sectionState.status === "na"
+      ? `
+        <textarea
+          id="naReason"
+          placeholder="Reason this section is not applicable...">${escapeHtml(sectionState.reason || "")}</textarea>
+      `
+      : ""
+  }
+</section>
     <section class="welcome">
       <h2>Fire Risk Findings</h2>
       <p>${escapeHtml(FRF.assessment.propertyName || "")} — universal core assessment. Select a section to record findings.</p>
@@ -556,7 +583,11 @@ function openFindingSection(encodedName) {
   const qs = UNIVERSAL_CORE.filter((q) => q.section === sectionName);
   const findings = FRF.assessment.findings || {};
   const photos = allPhotos(FRF.assessment);
-
+const sectionState =
+  FRF.assessment.findings?.sectionStates?.[sectionName] || {
+    status: "applicable",
+    reason: ""
+  };
   const blocks = qs.map((q) => {
     const f = findings[q.id] || blankFinding();
     const polarityLabel = q.polarity === "hazard" ? "Hazard (a 'Yes' is adverse)"
@@ -778,6 +809,31 @@ async function generateDraftFRA() {
     console.error("Generate Draft FRA failed:", err);
     alert("Could not contact the AI generator.");
   }
+}
+function setSectionStatus(encodedName, status) {
+  const sectionName = decodeURIComponent(encodedName);
+
+  if (!FRF.assessment.findings) {
+    FRF.assessment.findings = {};
+  }
+
+  if (!FRF.assessment.findings.sectionStates) {
+    FRF.assessment.findings.sectionStates = {};
+  }
+
+  const current =
+    FRF.assessment.findings.sectionStates[sectionName] || {
+      status: "applicable",
+      reason: ""
+    };
+
+  FRF.assessment.findings.sectionStates[sectionName] = {
+    ...current,
+    status
+  };
+
+  scheduleFindingSave();
+  openFindingSection(encodedName);
 }
 function escapeHtml(value) {
   return String(value)
