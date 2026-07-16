@@ -734,30 +734,6 @@ function openFindingSection(encodedName) {
           </label>
           <textarea id="finding-${q.id}" oninput="updateFinding('${q.id}','finding',this.value)">${escapeHtml(f.finding)}</textarea>
         </div>
-        <div class="form-group"><label>Existing controls</label>
-          <textarea oninput="updateFinding('${q.id}','existingControls',this.value)">${escapeHtml(f.existingControls)}</textarea></div>
-        <div class="form-group"><label>Recommendation</label>
-          <textarea oninput="updateFinding('${q.id}','recommendation',this.value)">${escapeHtml(f.recommendation)}</textarea></div>
-</div>
-        <div class="field-row">
-          <div class="form-group">
-            <label>Priority</label>
-            <select onchange="updateFinding('${q.id}','priority',this.value)">
-              <option value="" ${f.priority===""?"selected":""}>—</option>
-              <option value="immediate" ${f.priority==="immediate"?"selected":""}>Immediate</option>
-              <option value="high" ${f.priority==="high"?"selected":""}>High</option>
-              <option value="medium" ${f.priority==="medium"?"selected":""}>Medium</option>
-              <option value="low" ${f.priority==="low"?"selected":""}>Low</option>
-              <option value="advisory" ${f.priority==="advisory"?"selected":""}>Advisory</option>
-            </select>
-            ${suggested}
-          </div>
-          <div class="form-group"><label>Responsible party</label>
-            <input value="${escapeHtml(f.responsibleParty)}" oninput="updateFinding('${q.id}','responsibleParty',this.value)"></div>
-        </div>
-
-        <div class="form-group"><label>Limitations / notes</label>
-          <textarea oninput="updateFinding('${q.id}','limitations',this.value)">${escapeHtml(f.limitations)}</textarea></div>
 
         <div class="form-group"><label>Linked photographs</label>${photoPicker}</div>
       </div>`;
