@@ -464,7 +464,7 @@ async function saveBuildingDetails() {
 /* ============================================================
    Photographs
    ============================================================ */
-async function showPhotographs() {
+async function showPhotographs(returnSectionName = "") {
   renderLoading("Loading photographs…");
   const assessment = await Store.loadCurrent();
   if (!assessment || !assessment.id) { alert("Please create and save an assessment first."); showDashboard(); return; }
@@ -491,11 +491,24 @@ async function showPhotographs() {
       </div>`;
   }).join("");
 
-  document.querySelector(".container").innerHTML = `
-    <section class="welcome"><h2>Photographs</h2><p>Upload site photographs grouped by report category.</p></section>
-    <section class="welcome">${categoriesHtml}
-      <button class="action-button action-button-secondary" onclick="showAssessmentWorkspace()">Back to Workspace</button></section>
-  `;
+document.querySelector(".container").innerHTML = `
+  <section class="welcome">
+    <h2>Photographs</h2>
+    <p>Upload site photographs grouped by report category.</p>
+  </section>
+
+  <section class="welcome">
+    ${categoriesHtml}
+
+    <button
+      class="action-button action-button-secondary"
+      onclick="${returnSectionName
+        ? `openFindingSection('${returnSectionName}')`
+        : `showAssessmentWorkspace()`}">
+      ${returnSectionName ? "Back to Section" : "Back to Workspace"}
+    </button>
+  </section>
+`;
 }
 
 async function uploadPhoto(categoryKey) {
@@ -778,6 +791,11 @@ function openFindingSection(encodedName) {
   <p style="margin-top:12px;color:#666;">
     Upload clear photographs showing both compliant features and any defects relevant to this section.
   </p>
+  <button
+  type="button"
+  class="action-button action-button-primary"
+onclick="showPhotographs('${encodeURIComponent(sectionName)}')"  📷 Upload photographs
+</button>
 </section>
   `;
 }
