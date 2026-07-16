@@ -105,8 +105,7 @@ const SECTION_PHOTO_GUIDANCE = {
     "Any unusual occupancy or vulnerability factors"
   ],
 
-  "Fire Hazards": [
-    "Electrical installations and intake equipment",
+"Fire Hazards — Ignition, Fuel, Oxygen": [    "Electrical installations and intake equipment",
     "Heating and cooking equipment",
     "Combustible storage and waste",
     "Any visible ignition sources or hazardous processes"
