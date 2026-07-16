@@ -654,10 +654,39 @@ function openFindingSection(encodedName) {
 
   document.querySelector(".container").innerHTML = `
     <div class="save-indicator" id="saveIndicator"></div>
-    <section class="welcome">
-      <h2>${escapeHtml(sectionName)}</h2>
-      <p>${escapeHtml(FRF.assessment.propertyName || "")} — changes save automatically.</p>
-    </section>
+   <section class="welcome">
+  <h2>${escapeHtml(sectionName)}</h2>
+  <p>${escapeHtml(FRF.assessment.propertyName || "")} — changes save automatically.</p>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+    <button
+      type="button"
+      class="action-button ${sectionState.status === "applicable" ? "" : "action-button-secondary"}"
+      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','applicable')">
+      ✅ Applicable
+    </button>
+
+    <button
+      type="button"
+      class="action-button ${sectionState.status === "na" ? "" : "action-button-secondary"}"
+      onclick="setSectionStatus('${encodeURIComponent(sectionName)}','na')">
+      🚫 N/A
+    </button>
+  </div>
+
+  ${
+    sectionState.status === "na"
+      ? `
+        <div class="form-group" style="margin-top:14px;">
+          <label>Reason not applicable</label>
+          <textarea
+            oninput="updateSectionNAReason('${encodeURIComponent(sectionName)}', this.value)"
+            placeholder="Explain why this section is not applicable...">${escapeHtml(sectionState.reason || "")}</textarea>
+        </div>
+      `
+      : ``
+  }
+</section>
     <section class="welcome">
       ${blocks}
       <button class="action-button action-button-secondary" onclick="renderSectionList()">Back to Sections</button>
