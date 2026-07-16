@@ -468,9 +468,31 @@ async function showPhotographs(returnSectionName = "") {
   const assessment = await Store.loadCurrent();
   if (!assessment || !assessment.id) { alert("Please create and save an assessment first."); showDashboard(); return; }
   const photos = assessment.photos || {};
+const activeSectionName = returnSectionName
+  ? decodeURIComponent(returnSectionName)
+  : "";
 
-  const categoriesHtml = PHOTO_CATEGORIES.map((cat) => {
-    const list = photos[cat.key] || [];
+const visibleCategories = activeSectionName
+  ? PHOTO_CATEGORIES.filter((cat) => {
+      const sectionMap = {
+        "Scope & Responsible Persons": ["exterior", "management", "other"],
+        "Premises & Occupancy": ["exterior", "escape_routes", "other"],
+        "Fire Hazards — Ignition, Fuel, Oxygen": ["electrical", "heating_cooking", "housekeeping", "other"],
+        "Means of Escape": ["escape_routes", "signage", "lighting", "other"],
+        "Fire Detection & Warning": ["detection", "other"],
+        "Emergency Lighting & Signage": ["lighting", "signage", "other"],
+        "Firefighting Equipment": ["firefighting_equipment", "other"],
+        "Passive Fire Protection": ["compartmentation", "smoke_control", "other"],
+        "Firefighter Access & Facilities": ["exterior", "firefighter_facilities", "other"],
+        "Management, Testing & Records": ["management", "other"],
+        "Conclusions": ["other"]
+      };
+
+      return (sectionMap[activeSectionName] || PHOTO_CATEGORIES.map((item) => item.key))
+        .includes(cat.key);
+    })
+  : PHOTO_CATEGORIES;
+const categoriesHtml = visibleCategories.map((cat) => {    const list = photos[cat.key] || [];
     const thumbs = list.length
       ? list.map((p, i) => `
           <div class="photo-thumb">
