@@ -176,7 +176,8 @@ const text = (data.content || [])
   .map((block) => block.text)
   .join("\n")
   .trim();
-
+console.log("Claude stop reason:", data.stop_reason);
+console.log("Claude token usage:", data.usage);
 let draft;
 
 try {
