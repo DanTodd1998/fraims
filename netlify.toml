@@ -1,3 +1,6 @@
 [build]
   publish = "data"
   functions = "netlify/functions"
+  
+  [functions]
+  included_files = ["prompts/fra-system-prompt.txt"]
