@@ -775,7 +775,41 @@ function openFindingSection(encodedName) {
   }
 </section>
     <section class="welcome">
-      ${blocks}
+      <section class="question-block">
+  <div class="question-title">${escapeHtml(sectionName)}</div>
+
+  <div class="form-group">
+    <label>Assessor notes</label>
+    <textarea
+      id="sectionNotes"
+      placeholder="Add any notes to help generate the section assessment..."></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>Section assessment</label>
+    <textarea
+      id="sectionDraft"
+      placeholder="The AI-generated section paragraph will appear here..."></textarea>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button
+      type="button"
+      class="action-button action-button-primary">
+      🤖 Generate assessment
+    </button>
+
+    <button
+      type="button"
+      class="action-button action-button-secondary">
+      Clear
+    </button>
+  </div>
+</section>
+
+<div style="display:none;">
+  ${blocks}
+</div>
       <button class="action-button action-button-secondary" onclick="renderSectionList()">Back to Sections</button>
     </section>
     <section class="welcome">
