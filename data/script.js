@@ -793,11 +793,12 @@ function openFindingSection(encodedName) {
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <button
-      type="button"
-      class="action-button action-button-primary">
-      🤖 Generate assessment
-    </button>
+   <button
+  type="button"
+  class="action-button action-button-primary"
+  onclick="generateSectionAssessment('${encodeURIComponent(sectionName)}')">
+  🤖 Generate assessment
+</button>
 
     <button
       type="button"
@@ -995,6 +996,16 @@ function updateSectionNAReason(encodedName, reason) {
   FRF.assessment.findings.sectionStates[sectionName].reason = reason;
 
   scheduleFindingSave();
+}
+async function generateSectionAssessment(encodedSectionName) {
+  const sectionName = decodeURIComponent(encodedSectionName);
+
+  alert(`Generate assessment for: ${sectionName}`);
+
+  console.log("Generate Section Assessment:", {
+    section: sectionName,
+    assessment: FRF.assessment
+  });
 }
 function escapeHtml(value) {
   return String(value)
