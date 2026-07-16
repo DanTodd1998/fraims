@@ -90,7 +90,83 @@ const CORE_SECTIONS = UNIVERSAL_CORE.reduce((acc, q) => {
   if (!acc.includes(q.section)) acc.push(q.section);
   return acc;
 }, []);
+const SECTION_PHOTO_GUIDANCE = {
+  "Scope & Responsible Persons": [
+    "Building frontage and main entrance",
+    "Address or property identification",
+    "Fire action notices and resident information",
+    "Any access limitations or areas not inspected"
+  ],
 
+  "Premises & Occupancy": [
+    "General external views",
+    "Typical internal layout",
+    "Staircases, corridors and landings",
+    "Any unusual occupancy or vulnerability factors"
+  ],
+
+  "Fire Hazards": [
+    "Electrical installations and intake equipment",
+    "Heating and cooking equipment",
+    "Combustible storage and waste",
+    "Any visible ignition sources or hazardous processes"
+  ],
+
+  "Means of Escape": [
+    "Escape routes and corridors",
+    "Staircases and landings",
+    "Final exits",
+    "Obstructions, dead ends or restricted routes"
+  ],
+
+  "Fire Detection & Warning": [
+    "Alarm control panel",
+    "Detectors",
+    "Manual call points",
+    "Zone plan and warning devices"
+  ],
+
+  "Emergency Lighting & Signage": [
+    "Emergency luminaires",
+    "Exit and directional signs",
+    "Test switches or control equipment",
+    "Any damaged, missing or obscured fittings"
+  ],
+
+  "Firefighting Equipment": [
+    "Extinguishers and fire blankets",
+    "Hose reels or other equipment where present",
+    "Location signage",
+    "Service labels or obvious defects"
+  ],
+
+  "Passive Fire Protection": [
+    "Compartment walls and ceilings",
+    "Service penetrations",
+    "Visible fire-stopping",
+    "Any apparent breaches or damage"
+  ],
+
+  "Firefighter Access & Facilities": [
+    "Fire service access routes",
+    "Risers, inlets and outlets where present",
+    "Firefighting shafts or lifts where present",
+    "Control rooms, panels or access information"
+  ],
+
+  "Management, Testing & Records": [
+    "Fire logbook",
+    "Testing and maintenance records",
+    "Fire action notices",
+    "Relevant certificates and management documents"
+  ],
+
+  "Conclusions": [
+    "Any significant defects not already recorded",
+    "Overall building context",
+    "Any evidence supporting the final action plan"
+  ]
+};
 /* ============================================================
    Store — the ONLY place that talks to the database.
    ============================================================ */
@@ -561,6 +637,7 @@ function openFindingSection(encodedName) {
     status: "applicable",
     reason: ""
   };
+  const photoGuidance = SECTION_PHOTO_GUIDANCE[sectionName] || [];
   const blocks = qs.map((q) => {
     const f = findings[q.id] || blankFinding();
     const polarityLabel = q.polarity === "hazard" ? "Hazard (a 'Yes' is adverse)"
@@ -691,6 +768,17 @@ function openFindingSection(encodedName) {
       ${blocks}
       <button class="action-button action-button-secondary" onclick="renderSectionList()">Back to Sections</button>
     </section>
+    <section class="welcome">
+  <h3>📷 What should I photograph?</h3>
+
+  <ul style="margin:10px 0 0 20px;line-height:1.8;">
+    ${photoGuidance.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+  </ul>
+
+  <p style="margin-top:12px;color:#666;">
+    Upload clear photographs showing both compliant features and any defects relevant to this section.
+  </p>
+</section>
   `;
 }
 
