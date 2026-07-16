@@ -837,6 +837,28 @@ function setSectionStatus(encodedName, status) {
   scheduleFindingSave();
   openFindingSection(encodedName);
 }
+function updateSectionNAReason(encodedName, reason) {
+  const sectionName = decodeURIComponent(encodedName);
+
+  if (!FRF.assessment.findings) {
+    FRF.assessment.findings = {};
+  }
+
+  if (!FRF.assessment.findings.sectionStates) {
+    FRF.assessment.findings.sectionStates = {};
+  }
+
+  if (!FRF.assessment.findings.sectionStates[sectionName]) {
+    FRF.assessment.findings.sectionStates[sectionName] = {
+      status: "na",
+      reason: ""
+    };
+  }
+
+  FRF.assessment.findings.sectionStates[sectionName].reason = reason;
+
+  scheduleFindingSave();
+}
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
