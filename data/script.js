@@ -998,14 +998,46 @@ function updateSectionNAReason(encodedName, reason) {
   scheduleFindingSave();
 }
 async function generateSectionAssessment(encodedSectionName) {
+  async function generateSectionAssessment(encodedSectionName) {
   const sectionName = decodeURIComponent(encodedSectionName);
 
-  alert(`Generate assessment for: ${sectionName}`);
+  try {
+    const assessment = await Store.loadCurrent();
 
-  console.log("Generate Section Assessment:", {
-    section: sectionName,
-    assessment: FRF.assessment
-  });
+    const notes =
+      document.getElementById("sectionNotes")?.value || "";
+
+   const photos = allPhotos(assessment);
+
+    const response = await fetch("/.netlify/functions/ai-section-draft", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        assessment,
+        sectionName,
+        assessorNotes: notes,
+        photos,
+        sectionGuidance:
+          SECTION_PHOTO_GUIDANCE[sectionName] || []
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "AI request failed.");
+    }
+
+    document.getElementById("sectionDraft").value =
+      result.draft || "";
+
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  }
+}
 }
 function escapeHtml(value) {
   return String(value)
