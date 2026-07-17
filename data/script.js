@@ -327,6 +327,11 @@ async function showAssessmentWorkspace() {
   // Reset the action plan working copy so cell edits hydrate from fresh data.
   AP = { assessment: null, saveTimer: null };
 
+  // If a draft FRA is mid-generation (e.g. after a page reload), resume polling.
+  if (assessment.generatedReport?.status === "generating") {
+    pollDraftFRA(assessment.id);
+  }
+
   document.querySelector(".container").innerHTML = `
     <section class="welcome">
       <h2>${escapeHtml(assessment.propertyName || "New Assessment")}</h2>
@@ -348,6 +353,7 @@ async function showAssessmentWorkspace() {
       </button>
     </section>
     ${renderActionPlanSection(assessment)}
+    ${renderDraftFRASection(assessment)}
 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
 
   <button
@@ -441,6 +447,122 @@ function renderActionPlanSection(assessment) {
           </tbody>
         </table>
       </div>
+    </section>`;
+}
+
+// Renders the draft FRA review section: shows progress while generating, an
+// error if it failed, or the formatted report once ready. Structured so inline
+// editing can be added later without changing the data model.
+function renderDraftFRASection(assessment) {
+  const report = assessment.generatedReport || {};
+  const status = report.status;
+
+  if (status === "generating") {
+    return `
+      <section class="welcome" id="draftFraSection">
+        <h2>Draft Fire Risk Assessment</h2>
+        <p class="loading">Generating the draft assessment with AI… this can take up to a minute or two. You can keep working; this will update automatically when it's ready.</p>
+      </section>`;
+  }
+
+  if (status === "error") {
+    return `
+      <section class="welcome" id="draftFraSection">
+        <h2>Draft Fire Risk Assessment</h2>
+        <p class="upload-status error">Draft generation failed: ${escapeHtml(report.error || "unknown error")}. Please try again.</p>
+      </section>`;
+  }
+
+  if (status !== "ready" || !report.draft) {
+    // No report yet — nothing to show (the Generate button lives in the footer).
+    return "";
+  }
+
+  const d = report.draft;
+
+  const sectionOrder = [
+    ["scopeResponsiblePersons", "Scope & Responsible Persons"],
+    ["premisesOccupancy", "Premises & Occupancy"],
+    ["fireHazards", "Fire Hazards"],
+    ["meansOfEscape", "Means of Escape"],
+    ["fireDetectionWarning", "Fire Detection & Warning"],
+    ["emergencyLightingSignage", "Emergency Lighting & Signage"],
+    ["firefightingEquipment", "Firefighting Equipment"],
+    ["passiveFireProtection", "Passive Fire Protection"],
+    ["firefighterAccessFacilities", "Firefighter Access & Facilities"],
+    ["managementTestingRecords", "Management, Testing & Records"],
+    ["conclusions", "Conclusions"],
+    ["limitations", "Limitations"]
+  ];
+
+  const narrative = sectionOrder
+    .filter(([key]) => d[key] && String(d[key]).trim())
+    .map(
+      ([key, label]) => `
+        <div class="draft-fra-block">
+          <h3>${escapeHtml(label)}</h3>
+          <p style="white-space:pre-wrap;line-height:1.6;">${escapeHtml(String(d[key]))}</p>
+        </div>`
+    )
+    .join("");
+
+  const recs = Array.isArray(d.recommendations) ? d.recommendations : [];
+  const recRows = recs.length
+    ? recs
+        .map(
+          (r) => `
+            <tr>
+              <td>${escapeHtml(String(r.action || ""))}</td>
+              <td>${escapeHtml(String(r.priority || ""))}</td>
+              <td>${escapeHtml(String(r.responsibleParty || ""))}</td>
+              <td>${escapeHtml(String(r.targetDate || ""))}</td>
+            </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="4" class="list-empty" style="text-align:center;">No recommendations returned.</td></tr>`;
+
+  const recommendationsHtml = `
+    <div class="draft-fra-block">
+      <h3>Recommendations</h3>
+      <div style="overflow-x:auto;">
+        <table class="action-plan-table">
+          <thead>
+            <tr><th>Action</th><th>Priority</th><th>Responsible Party</th><th>Target Date</th></tr>
+          </thead>
+          <tbody>${recRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  const appendix = Array.isArray(d.photoAppendix) ? d.photoAppendix : [];
+  const appendixHtml = appendix.length
+    ? `
+      <div class="draft-fra-block">
+        <h3>Photograph Appendix</h3>
+        ${appendix
+          .map(
+            (p) => `
+              <div style="margin-bottom:10px;">
+                <strong>${escapeHtml(String(p.photoId || ""))}</strong>
+                ${p.category ? ` — ${escapeHtml(String(p.category))}` : ""}
+                <div style="line-height:1.6;">${escapeHtml(String(p.caption || ""))}${p.observation ? " " + escapeHtml(String(p.observation)) : ""}</div>
+              </div>`
+          )
+          .join("")}
+      </div>`
+    : "";
+
+  const generatedWhen = report.updatedAt
+    ? new Date(report.updatedAt).toLocaleString()
+    : "";
+
+  return `
+    <section class="welcome" id="draftFraSection">
+      <h2>Draft Fire Risk Assessment</h2>
+      <p>AI-generated draft for assessor review${generatedWhen ? ` — generated ${escapeHtml(generatedWhen)}` : ""}. Review carefully; the assessor remains responsible for the final report.</p>
+      ${narrative}
+      ${recommendationsHtml}
+      ${appendixHtml}
     </section>`;
 }
 
@@ -1191,29 +1313,78 @@ async function generateDraftFRA() {
     return;
   }
 
-  console.log("Assessment being sent to AI:", assessment);
+  const existing = assessment.generatedReport || {};
+  if (existing.status === "ready") {
+    const proceed = confirm(
+      "This will regenerate the draft Fire Risk Assessment and replace the current one. Continue?"
+    );
+    if (!proceed) return;
+  }
 
   try {
-    const response = await fetch("/.netlify/functions/generate-fra", {
+    // Mark the report as generating so the UI shows progress and polling begins.
+    assessment.generatedReport = {
+      status: "generating",
+      startedAt: new Date().toISOString()
+    };
+    await Store.save(assessment);
+    showAssessmentWorkspace();
+
+    // Fire the background function. It returns 202 immediately; the real work
+    // continues server-side and the result is written back to Supabase.
+    fetch("/.netlify/functions/generate-fra-background", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        assessment
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assessment })
+    }).catch((err) => {
+      console.error("Could not start Draft FRA generation:", err);
     });
 
-    const result = await response.json();
-
-    console.log("Generate FRA response:", result);
-
-    alert(result.message || result.error || "Unknown response");
-
+    // Begin polling for the finished report.
+    pollDraftFRA(assessment.id);
   } catch (err) {
     console.error("Generate Draft FRA failed:", err);
-    alert("Could not contact the AI generator.");
+    alert("Could not start the AI generator.");
   }
+}
+
+// Polls Supabase for the background function's result. Stops when the report is
+// ready or errored, when the user navigates away, or after a safety timeout.
+let draftFRAPollTimer = null;
+
+function pollDraftFRA(assessmentId, attempt = 0) {
+  const MAX_ATTEMPTS = 90; // ~4.5 minutes at 3s intervals
+  if (draftFRAPollTimer) clearTimeout(draftFRAPollTimer);
+
+  draftFRAPollTimer = setTimeout(async () => {
+    // Stop if the user has moved to a different assessment.
+    if (Store.currentId !== assessmentId) return;
+
+    let latest;
+    try {
+      latest = await Store.load(assessmentId);
+    } catch (err) {
+      console.warn("Poll failed, will retry:", err.message);
+      if (attempt < MAX_ATTEMPTS) pollDraftFRA(assessmentId, attempt + 1);
+      return;
+    }
+
+    const report = latest.generatedReport || {};
+
+    if (report.status === "ready" || report.status === "error") {
+      // Only re-render if still viewing this assessment's workspace.
+      if (Store.currentId === assessmentId) {
+        showAssessmentWorkspace();
+      }
+      return;
+    }
+
+    if (attempt < MAX_ATTEMPTS) {
+      pollDraftFRA(assessmentId, attempt + 1);
+    } else {
+      console.warn("Draft FRA polling timed out.");
+    }
+  }, 3000);
 }
 async function generateActionPlan() {
   const assessment = await Store.loadCurrent();
