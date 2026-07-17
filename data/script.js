@@ -998,7 +998,6 @@ function updateSectionNAReason(encodedName, reason) {
   scheduleFindingSave();
 }
 async function generateSectionAssessment(encodedSectionName) {
-  async function generateSectionAssessment(encodedSectionName) {
   const sectionName = decodeURIComponent(encodedSectionName);
 
   try {
@@ -1037,7 +1036,6 @@ async function generateSectionAssessment(encodedSectionName) {
     console.error(err);
     alert(err.message);
   }
-}
 }
 function escapeHtml(value) {
   return String(value)
