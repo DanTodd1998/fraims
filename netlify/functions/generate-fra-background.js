@@ -210,7 +210,7 @@ ${JSON.stringify(assessment, null, 2)}
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 8000,
+        max_tokens: 16000,
         messages: [
           {
             role: "user",
