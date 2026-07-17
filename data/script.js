@@ -190,7 +190,7 @@ const Store = {
       building_details: a.buildingDetails || {},
       findings: a.findings || {},
       photos: a.photos || {},
-      recommendations: a.recommendations || [],
+      recommendations: a.actionPlan || [],
       risk_evaluation: a.riskEvaluation || {},
       approval: a.approval || {},
       generated_report: a.generatedReport || {}
@@ -213,7 +213,7 @@ const Store = {
       buildingDetails: r.building_details || {},
       findings: r.findings || {},
       photos: r.photos || {},
-      recommendations: r.recommendations || [],
+      actionPlan: r.recommendations || [],
       riskEvaluation: r.risk_evaluation || {},
       approval: r.approval || {},
       generatedReport: r.generated_report || {}
@@ -324,6 +324,9 @@ async function showAssessmentWorkspace() {
   const assessment = await Store.loadCurrent();
   if (!assessment) { alert("No assessment is currently open."); showDashboard(); return; }
 
+  // Reset the action plan working copy so cell edits hydrate from fresh data.
+  AP = { assessment: null, saveTimer: null };
+
   document.querySelector(".container").innerHTML = `
     <section class="welcome">
       <h2>${escapeHtml(assessment.propertyName || "New Assessment")}</h2>
@@ -344,6 +347,7 @@ async function showAssessmentWorkspace() {
         <p>Record hazards, controls and significant findings.</p>
       </button>
     </section>
+    ${renderActionPlanSection(assessment)}
 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
 
   <button
@@ -359,6 +363,85 @@ async function showAssessmentWorkspace() {
   </button>
 
 </div>  `;
+}
+
+// Builds the editable Action Plan block shown at the bottom of the workspace,
+// immediately before Overall Risk Evaluation.
+function renderActionPlanSection(assessment) {
+  const actions = Array.isArray(assessment.actionPlan)
+    ? assessment.actionPlan
+    : [];
+
+  const priorities = ["Immediate", "High", "Medium", "Low"];
+
+  const rows = actions.length
+    ? actions.map((a, i) => {
+        const priorityOptions = priorities
+          .map(
+            (p) =>
+              `<option value="${p}" ${a.priority === p ? "selected" : ""}>${p}</option>`
+          )
+          .join("");
+
+        return `
+          <tr>
+            <td><textarea class="ap-cell" oninput="updateActionPlanCell(${i},'category',this.value)">${escapeHtml(a.category || "")}</textarea></td>
+            <td><textarea class="ap-cell" oninput="updateActionPlanCell(${i},'finding',this.value)">${escapeHtml(a.finding || "")}</textarea></td>
+            <td><textarea class="ap-cell" oninput="updateActionPlanCell(${i},'action',this.value)">${escapeHtml(a.action || "")}</textarea></td>
+            <td>
+              <select class="ap-cell" onchange="updateActionPlanCell(${i},'priority',this.value)">
+                ${priorityOptions}
+              </select>
+            </td>
+            <td><textarea class="ap-cell" oninput="updateActionPlanCell(${i},'responsiblePerson',this.value)">${escapeHtml(a.responsiblePerson || "")}</textarea></td>
+            <td><textarea class="ap-cell" oninput="updateActionPlanCell(${i},'targetTimescale',this.value)">${escapeHtml(a.targetTimescale || "")}</textarea></td>
+            <td><button class="remove-photo" title="Delete action" onclick="deleteActionPlanRow(${i})">×</button></td>
+          </tr>`;
+      }).join("")
+    : `<tr><td colspan="7" class="list-empty" style="text-align:center;">No actions yet. Generate an action plan or add one manually.</td></tr>`;
+
+  return `
+    <section class="welcome" id="actionPlanSection">
+      <div class="save-indicator" id="actionPlanSaveIndicator"></div>
+      <h2>Action Plan</h2>
+      <p>Corrective actions arising from the assessment. Every cell is editable, and changes save automatically.</p>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <button
+          type="button"
+          id="generateActionPlanBtn"
+          class="action-button action-button-primary"
+          onclick="generateActionPlan()">
+          🤖 Generate Action Plan
+        </button>
+
+        <button
+          type="button"
+          class="action-button action-button-secondary"
+          onclick="addActionPlanRow()">
+          ➕ Add Action
+        </button>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="action-plan-table">
+          <thead>
+            <tr>
+              <th>Hazard Category</th>
+              <th>Finding</th>
+              <th>Action Required</th>
+              <th>Priority</th>
+              <th>Responsible Person</th>
+              <th>Target Timescale</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    </section>`;
 }
 
 function showDashboard() { location.reload(); }
@@ -1129,6 +1212,143 @@ async function generateDraftFRA() {
     alert("Could not contact the AI generator.");
   }
 }
+async function generateActionPlan() {
+  const assessment = await Store.loadCurrent();
+
+  if (!assessment) {
+    alert("No assessment is currently open.");
+    showDashboard();
+    return;
+  }
+
+  const existing = Array.isArray(assessment.actionPlan)
+    ? assessment.actionPlan
+    : [];
+
+  if (existing.length) {
+    const proceed = confirm(
+      "This will regenerate the action plan from the latest section assessments and replace the current table, including any manual edits. Continue?"
+    );
+    if (!proceed) {
+      return;
+    }
+  }
+
+  const btn = document.getElementById("generateActionPlanBtn");
+  const originalLabel = btn ? btn.textContent : "";
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Generating…";
+  }
+
+  try {
+    const response = await fetch("/.netlify/functions/ai-action-plan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        assessment
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Action plan request failed.");
+    }
+
+    const actions = Array.isArray(result.actions) ? result.actions : [];
+
+    assessment.actionPlan = actions;
+
+    await Store.save(assessment);
+
+    showAssessmentWorkspace();
+  } catch (err) {
+    console.error("Generate Action Plan failed:", err);
+    alert(err.message || "Could not generate the action plan.");
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+}
+
+/* ============================================================
+   ACTION PLAN — editable table with debounced auto-save.
+   Working copy mirrors the FRF pattern used by the findings screen.
+   ============================================================ */
+let AP = { assessment: null, saveTimer: null };
+
+// Ensure the working copy is loaded before an edit is applied. The workspace
+// re-renders from Store.loadCurrent(), so we lazily hydrate AP.assessment the
+// first time a cell is edited after a render.
+async function ensureActionPlanWorkingCopy() {
+  if (!AP.assessment) {
+    AP.assessment = await Store.loadCurrent();
+  }
+  if (AP.assessment && !Array.isArray(AP.assessment.actionPlan)) {
+    AP.assessment.actionPlan = [];
+  }
+  return AP.assessment;
+}
+
+async function updateActionPlanCell(index, field, value) {
+  const assessment = await ensureActionPlanWorkingCopy();
+  if (!assessment || !assessment.actionPlan[index]) return;
+  assessment.actionPlan[index][field] = value;
+  scheduleActionPlanSave();
+}
+
+async function addActionPlanRow() {
+  const assessment = await ensureActionPlanWorkingCopy();
+  if (!assessment) return;
+  assessment.actionPlan.push({
+    category: "",
+    finding: "",
+    action: "",
+    priority: "Medium",
+    responsiblePerson: "Responsible Person",
+    targetTimescale: ""
+  });
+  await commitActionPlanSave();
+  showAssessmentWorkspace();
+}
+
+async function deleteActionPlanRow(index) {
+  const assessment = await ensureActionPlanWorkingCopy();
+  if (!assessment || !assessment.actionPlan[index]) return;
+  if (!confirm("Delete this action?")) return;
+  assessment.actionPlan.splice(index, 1);
+  await commitActionPlanSave();
+  showAssessmentWorkspace();
+}
+
+// Debounced save — waits for a pause in editing, then writes once.
+function scheduleActionPlanSave() {
+  const ind = document.getElementById("actionPlanSaveIndicator");
+  if (ind) { ind.textContent = "Editing…"; ind.className = "save-indicator saving"; }
+  if (AP.saveTimer) clearTimeout(AP.saveTimer);
+  AP.saveTimer = setTimeout(commitActionPlanSave, 1000);
+}
+
+async function commitActionPlanSave() {
+  const ind = document.getElementById("actionPlanSaveIndicator");
+  if (ind) { ind.textContent = "Saving…"; ind.className = "save-indicator saving"; }
+  if (!AP.assessment) return;
+  try {
+    const saved = await Store.save(AP.assessment);
+    AP.assessment.updatedAt = saved.updatedAt;
+    if (ind) { ind.textContent = "Saved ✓"; ind.className = "save-indicator saved"; }
+  } catch (err) {
+    console.error("Action plan save failed:", err);
+    if (ind) { ind.textContent = "Save failed — check connection. Your edits are kept on screen."; ind.className = "save-indicator error"; }
+  }
+}
+
 function setSectionStatus(encodedName, status) {
   const sectionName = decodeURIComponent(encodedName);
 
