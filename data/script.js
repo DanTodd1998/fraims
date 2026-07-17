@@ -641,7 +641,6 @@ async function uploadSectionPhotos(encodedSectionName) {
     );
 
     fileInput.value = "";
-    showInspectionSection(sectionName);
   } catch (err) {
     console.error(err);
 
