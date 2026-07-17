@@ -1,170 +1,168 @@
-exports.handler = async function (event) {
+exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: "Method not allowed" })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Method not allowed" }),
     };
   }
 
-  try {
-    const {
-      assessment,
-      sectionName,
-      sectionGuidance = [],
-      assessorNotes = "",
-      photos = []
-    } = JSON.parse(event.body || "{}");
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
-    if (!assessment) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Assessment data is required." })
-      };
-    }
-
-    if (!sectionName) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Section name is required." })
-      };
-    }
-
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-
-    if (!anthropicApiKey) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Anthropic API key is not configured." })
-      };
-    }
-
-    const buildingOverview = {
-      propertyName: assessment.propertyName || "",
-      propertyReference: assessment.propertyReference || "",
-      propertyAddress: assessment.propertyAddress || "",
-      clientName: assessment.clientName || "",
-      assessorName: assessment.assessorName || "",
-      assessmentDate: assessment.assessmentDate || "",
-      construction: assessment.construction || "",
-      age: assessment.age || "",
-      height: assessment.height || "",
-      storeys: assessment.storeys || "",
-      occupancy: assessment.occupancy || "",
-      use: assessment.use || "",
-      layout: assessment.layout || "",
-      vulnerablePersons: assessment.vulnerablePersons || "",
-      fireStrategy: assessment.fireStrategy || "",
-      accessLimitations: assessment.accessLimitations || "",
-      previousAssessment: assessment.previousAssessment || "",
-      generalNotes: assessment.generalNotes || ""
+  if (!apiKey) {
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: "Server misconfigured: missing API key",
+      }),
     };
+  }
 
-    const prompt = `
-You are assisting a competent UK fire risk assessor.
+  let assessment;
+  let sectionName;
+  let assessorNotes;
+  let photos;
+  let sectionGuidance;
 
-Write one professional, concise and evidence-led narrative paragraph for the following fire risk assessment section.
+  try {
+    const parsedBody = JSON.parse(event.body || "{}");
 
-Section:
+    assessment = parsedBody.assessment;
+    sectionName = parsedBody.sectionName;
+    assessorNotes = parsedBody.assessorNotes || "";
+    photos = parsedBody.photos || [];
+    sectionGuidance = parsedBody.sectionGuidance || [];
+  } catch {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Invalid JSON body" }),
+    };
+  }
+
+  if (!assessment || typeof assessment !== "object") {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: "Missing assessment object",
+      }),
+    };
+  }
+
+  if (!sectionName || typeof sectionName !== "string") {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: "Missing section name",
+      }),
+    };
+  }
+
+  const photoSummary = photos.map((photo) => ({
+    label: photo.label || "",
+    reference: photo.ref || "",
+  }));
+
+  const prompt = `
+You are assisting a competent fire risk assessor in the United Kingdom.
+
+Draft one professional assessment paragraph for the following fire risk
+assessment section:
+
+SECTION:
 ${sectionName}
 
-Building overview:
-${JSON.stringify(buildingOverview, null, 2)}
+ASSESSOR NOTES:
+${assessorNotes || "No assessor notes have been entered."}
 
-Section guidance:
-${sectionGuidance.length ? sectionGuidance.join("\n- ") : "No specific guidance supplied."}
+SECTION GUIDANCE:
+${JSON.stringify(sectionGuidance, null, 2)}
 
-Assessor notes:
-${assessorNotes || "No assessor notes supplied."}
+AVAILABLE PHOTOGRAPH REFERENCES:
+${JSON.stringify(photoSummary, null, 2)}
 
-Number of photographs supplied:
-${photos.length}
+ASSESSMENT INFORMATION:
+${JSON.stringify(assessment, null, 2)}
 
-Important rules:
-- Use UK fire risk assessment terminology.
-- Do not invent facts.
-- Do not claim compliance unless the supplied evidence supports it.
-- Where evidence is insufficient, say so clearly and identify what further inspection, testing or documentation may be required.
-- Keep the output as one coherent paragraph.
-- Do not include headings, bullet points, JSON or markdown.
-- The paragraph must remain suitable for manual editing and approval by the assessor.
-`;
+Rules:
 
-    const content = [
-      {
-        type: "text",
-        text: prompt
-      }
-    ];
+- Use only the information supplied.
+- Do not invent facts, dimensions, materials, controls or defects.
+- Do not claim to have visually inspected a photograph.
+- Do not make a final statutory compliance judgement.
+- Write in professional UK fire risk assessment language.
+- Produce one coherent paragraph suitable for an FRA report.
+- Clearly identify material limitations or missing information where relevant.
+- Do not include headings, bullet points, markdown or explanatory commentary.
+- Return plain text only.
+`.trim();
 
-    for (const photo of photos) {
-      if (!photo?.url) continue;
-
-      content.push({
-        type: "image",
-        source: {
-          type: "url",
-          url: photo.url
-        }
-      });
-    }
-
+  try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01"
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1200,
+        model: "claude-sonnet-5",
+        max_tokens: 700,
         messages: [
           {
             role: "user",
-            content
-          }
-        ]
-      })
+            content: prompt,
+          },
+        ],
+      }),
     });
 
-    const result = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
-      console.error("Anthropic error:", result);
-
       return {
         statusCode: response.status,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: result?.error?.message || "Anthropic request failed."
-        })
+          error: "Anthropic API error",
+          detail: data,
+        }),
       };
     }
 
-    const draft = (result.content || [])
-      .filter(item => item.type === "text")
-      .map(item => item.text)
+    const draft = (data.content || [])
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
       .join("\n")
       .trim();
 
     if (!draft) {
       return {
         statusCode: 502,
-        body: JSON.stringify({ error: "Claude returned no draft text." })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "AI returned an empty response",
+        }),
       };
     }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ draft })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draft }),
     };
   } catch (error) {
-    console.error("ai-section-draft failed:", error);
+    console.error("Anthropic request failed:", error);
 
     return {
-      statusCode: 500,
+      statusCode: 502,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        error: error.message || "Could not generate section draft."
-      })
+        error: "Failed to reach Anthropic API",
+      }),
     };
   }
 };
