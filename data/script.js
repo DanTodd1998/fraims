@@ -535,19 +535,20 @@ async function removeSectionPhoto(encodedSectionName, photoIndex) {
   const sectionName = decodeURIComponent(encodedSectionName);
   const assessment = await Store.loadCurrent();
 
-  if (!assessment?.sectionPhotos?.[sectionName]) {
+  const sectionPhotos =
+    assessment?.photos?.sectionPhotos?.[sectionName];
+
+  if (!sectionPhotos) {
     return;
   }
 
-  const photo = assessment.sectionPhotos[sectionName][photoIndex];
+  const photo = sectionPhotos[photoIndex];
 
   if (!photo) {
     return;
   }
 
-  const confirmed = confirm("Remove this photograph?");
-
-  if (!confirmed) {
+  if (!confirm("Remove this photograph?")) {
     return;
   }
 
@@ -562,11 +563,12 @@ async function removeSectionPhoto(encodedSectionName, photoIndex) {
       }
     }
 
-    assessment.sectionPhotos[sectionName].splice(photoIndex, 1);
+    sectionPhotos.splice(photoIndex, 1);
 
     await Store.save(assessment);
 
-    showInspectionSection(sectionName);
+    FRF.assessment = await Store.loadCurrent();
+    openFindingSection(encodeURIComponent(sectionName));
   } catch (err) {
     console.error("Could not remove section photograph:", err);
     alert("Could not remove the photograph.");
@@ -587,24 +589,35 @@ async function uploadSectionPhotos(encodedSectionName) {
   const files = Array.from(fileInput?.files || []);
 
   if (!files.length) {
-    setStatus(statusEl, "Choose at least one photograph first.", "error");
+    setStatus(
+      statusEl,
+      "Choose at least one photograph first.",
+      "error"
+    );
     return;
   }
 
-  if (!assessment.sectionPhotos) {
-    assessment.sectionPhotos = {};
+  if (!assessment.photos) {
+    assessment.photos = {};
   }
 
-  if (!assessment.sectionPhotos[sectionName]) {
-    assessment.sectionPhotos[sectionName] = [];
+  if (!assessment.photos.sectionPhotos) {
+    assessment.photos.sectionPhotos = {};
+  }
+
+  if (!assessment.photos.sectionPhotos[sectionName]) {
+    assessment.photos.sectionPhotos[sectionName] = [];
   }
 
   setStatus(statusEl, "Uploading…", "");
 
   try {
     for (const file of files) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const safeSection = sectionName.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const safeName =
+        file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+      const safeSection =
+        sectionName.replace(/[^a-zA-Z0-9_-]/g, "_");
 
       const path =
         `${assessment.id}/sections/${safeSection}/${Date.now()}-${safeName}`;
@@ -624,7 +637,7 @@ async function uploadSectionPhotos(encodedSectionName) {
         .from(PHOTO_BUCKET)
         .getPublicUrl(path);
 
-      assessment.sectionPhotos[sectionName].push({
+      assessment.photos.sectionPhotos[sectionName].push({
         path,
         url: urlData.publicUrl,
         name: file.name,
@@ -634,13 +647,11 @@ async function uploadSectionPhotos(encodedSectionName) {
 
     await Store.save(assessment);
 
-    setStatus(
-      statusEl,
-      `${files.length} photograph${files.length === 1 ? "" : "s"} uploaded.`,
-      "success"
-    );
+    FRF.assessment = await Store.loadCurrent();
 
-    fileInput.value = "";
+    openFindingSection(
+      encodeURIComponent(sectionName)
+    );
   } catch (err) {
     console.error(err);
 
@@ -929,8 +940,8 @@ function openFindingSection(encodedName) {
   class="photo-thumbs"
   id="sectionPhotoThumbs">
   ${
-    ((FRF.assessment.sectionPhotos || {})[sectionName] || []).length
-      ? ((FRF.assessment.sectionPhotos || {})[sectionName] || [])
+    (FRF.assessment.photos?.sectionPhotos?.[sectionName] || []).length
+      ? (FRF.assessment.photos?.sectionPhotos?.[sectionName] || [])
           .map((photo, index) => `
             <div class="photo-thumb">
               <img
@@ -950,6 +961,8 @@ function openFindingSection(encodedName) {
       : `<p class="photo-empty">No photographs uploaded yet.</p>`
   }
 </div>
+</div>
+
   <div class="form-group">
     <label>Section assessment</label>
     <textarea
@@ -991,7 +1004,8 @@ function openFindingSection(encodedName) {
   <button
   type="button"
   class="action-button action-button-primary"
-onclick="showPhotographs('${encodeURIComponent(sectionName)}')"  📷 Upload photographs
+  onclick="showPhotographs('${encodeURIComponent(sectionName)}')">
+  📷 Upload photographs
 </button>
 </section>
   `;
@@ -1163,15 +1177,21 @@ function updateSectionNAReason(encodedName, reason) {
   scheduleFindingSave();
 }
 async function generateSectionAssessment(encodedSectionName) {
-  const sectionName = decodeURIComponent(encodedSectionName);
+  const sectionName =
+    decodeURIComponent(encodedSectionName);
 
   try {
     const assessment = await Store.loadCurrent();
 
+    if (!assessment) {
+      throw new Error("No assessment is currently open.");
+    }
+
     const notes =
       document.getElementById("sectionNotes")?.value || "";
 
-   const photos = allPhotos(assessment);
+    const photos =
+      assessment.photos?.sectionPhotos?.[sectionName] || [];
 
     const response = await fetch("/.netlify/functions/ai-section-draft", {
       method: "POST",
@@ -1194,12 +1214,18 @@ async function generateSectionAssessment(encodedSectionName) {
       throw new Error(result.error || "AI request failed.");
     }
 
-    document.getElementById("sectionDraft").value =
-      result.draft || "";
+    const draftEl =
+      document.getElementById("sectionDraft");
+
+    if (!draftEl) {
+      throw new Error("Section assessment field was not found.");
+    }
+
+    draftEl.value = result.draft || "";
 
   } catch (err) {
-    console.error(err);
-    alert(err.message);
+    console.error("Section assessment generation failed:", err);
+    alert(err.message || "Could not generate assessment.");
   }
 }
 function escapeHtml(value) {
