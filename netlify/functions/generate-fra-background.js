@@ -210,7 +210,7 @@ ${JSON.stringify(assessment, null, 2)}
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 3500,
+        max_tokens: 8000,
         messages: [
           {
             role: "user",
@@ -245,14 +245,39 @@ ${JSON.stringify(assessment, null, 2)}
     console.log("Claude stop reason:", data.stop_reason);
     console.log("Claude token usage:", data.usage);
 
+    // Claude sometimes wraps JSON in markdown fences or adds stray text.
+    // Strip fences, and if needed fall back to the outermost { ... } block.
+    function extractJson(raw) {
+      let cleaned = String(raw || "")
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+
+      try {
+        return JSON.parse(cleaned);
+      } catch (e) {
+        const first = cleaned.indexOf("{");
+        const last = cleaned.lastIndexOf("}");
+        if (first !== -1 && last !== -1 && last > first) {
+          return JSON.parse(cleaned.slice(first, last + 1));
+        }
+        throw e;
+      }
+    }
+
     let draft;
     try {
-      draft = JSON.parse(text);
+      draft = extractJson(text);
     } catch (parseError) {
-      console.error("Claude returned invalid JSON:", text);
+      console.error("Claude returned invalid JSON. stop_reason:", data.stop_reason);
+      console.error("Raw text:", text);
       await writeReport(assessment.id, {
         status: "error",
-        error: "Claude returned an invalid report format.",
+        error:
+          data.stop_reason === "max_tokens"
+            ? "The report was too long and was cut off. Please try again."
+            : "Claude returned an invalid report format.",
         raw: text,
         updatedAt: new Date().toISOString(),
       });
