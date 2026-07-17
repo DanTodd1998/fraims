@@ -71,6 +71,50 @@ exports.handler = async (event) => {
     };
   }
 
+  console.log("Section AI request:", sectionName);
+  console.log("Received photos:", JSON.stringify(photos));
+
+  // Derive a supported Anthropic media type from the response header,
+  // falling back to the filename extension when the server sends a
+  // generic type such as application/octet-stream.
+  function inferMediaType(photo, responseType) {
+    const cleanType = String(responseType || "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+
+    const supported = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+
+    if (supported.includes(cleanType)) {
+      return cleanType;
+    }
+
+    const name = String(photo && photo.name ? photo.name : "").toLowerCase();
+
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+      return "image/jpeg";
+    }
+
+    if (name.endsWith(".png")) {
+      return "image/png";
+    }
+
+    if (name.endsWith(".gif")) {
+      return "image/gif";
+    }
+
+    if (name.endsWith(".webp")) {
+      return "image/webp";
+    }
+
+    return "";
+  }
+
   try {
     const imageBlocks = [];
 
@@ -85,8 +129,16 @@ exports.handler = async (event) => {
     for (let index = 0; index < usablePhotos.length; index += 1) {
       const photo = usablePhotos[index];
 
+      console.log(`Fetching section photo ${index + 1}:`, photo.url);
+
       try {
         const imageResponse = await fetch(photo.url);
+
+        console.log(
+          `Image response ${index + 1}:`,
+          imageResponse.status,
+          imageResponse.headers.get("content-type")
+        );
 
         if (!imageResponse.ok) {
           console.warn(
@@ -96,23 +148,16 @@ exports.handler = async (event) => {
           continue;
         }
 
-        const contentTypeHeader =
-          imageResponse.headers.get("content-type") || "";
+        const mediaType = inferMediaType(
+          photo,
+          imageResponse.headers.get("content-type")
+        );
 
-        const mediaType =
-          contentTypeHeader.split(";")[0].trim().toLowerCase();
-
-        const allowedMediaTypes = [
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-        ];
-
-        if (!allowedMediaTypes.includes(mediaType)) {
+        if (!mediaType) {
           console.warn(
             `Skipping unsupported image type for photo ${index + 1}:`,
-            mediaType
+            imageResponse.headers.get("content-type"),
+            photo.name
           );
           continue;
         }
@@ -120,6 +165,13 @@ exports.handler = async (event) => {
         const arrayBuffer = await imageResponse.arrayBuffer();
         const base64Data =
           Buffer.from(arrayBuffer).toString("base64");
+
+        if (!base64Data) {
+          console.warn(
+            `Skipping photo ${index + 1}: base64 conversion produced no data`
+          );
+          continue;
+        }
 
         imageBlocks.push({
           type: "text",
@@ -144,6 +196,12 @@ exports.handler = async (event) => {
       }
     }
 
+    const imagesProcessed = imageBlocks.filter(
+      (block) => block.type === "image"
+    ).length;
+
+    console.log("Images sent to Anthropic:", imagesProcessed);
+
     const prompt = `
 You are assisting a competent fire risk assessor in the United Kingdom.
 
@@ -161,6 +219,8 @@ ${JSON.stringify(sectionGuidance, null, 2)}
 
 ASSESSMENT INFORMATION:
 ${JSON.stringify(assessment, null, 2)}
+
+NUMBER OF USABLE SECTION PHOTOGRAPHS SUPPLIED: ${imagesProcessed}
 
 Instructions:
 
@@ -219,6 +279,7 @@ Instructions:
         body: JSON.stringify({
           error: "Anthropic API error",
           detail: data,
+          imagesProcessed,
         }),
       };
     }
@@ -235,6 +296,7 @@ Instructions:
         headers: jsonHeaders,
         body: JSON.stringify({
           error: "AI returned an empty response",
+          imagesProcessed,
         }),
       };
     }
@@ -244,9 +306,7 @@ Instructions:
       headers: jsonHeaders,
       body: JSON.stringify({
         draft,
-        imagesProcessed: imageBlocks.filter(
-          (block) => block.type === "image"
-        ).length,
+        imagesProcessed,
       }),
     };
   } catch (error) {
