@@ -534,21 +534,69 @@ function renderDraftFRASection(assessment) {
       </div>
     </div>`;
 
-  const appendix = Array.isArray(d.photoAppendix) ? d.photoAppendix : [];
-  const appendixHtml = appendix.length
+  // Build the photo appendix from the REAL uploaded photos (so images always
+  // show), and attach the AI's caption/observation by matching photoId.
+  const aiAppendix = Array.isArray(d.photoAppendix) ? d.photoAppendix : [];
+  const aiById = {};
+  aiAppendix.forEach((p) => {
+    if (p && p.photoId) aiById[String(p.photoId).toUpperCase().trim()] = p;
+  });
+
+  // Enumerate real photos exactly as the background function builds their IDs.
+  const realPhotos = [];
+  const allPhotoData = assessment.photos || {};
+
+  Object.entries(allPhotoData).forEach(([category, list]) => {
+    if (category === "sectionPhotos") return;
+    if (!Array.isArray(list)) return;
+    list.forEach((photo, index) => {
+      if (!photo || !photo.url) return;
+      realPhotos.push({
+        id: `${category.toUpperCase()}-${String(index + 1).padStart(3, "0")}`,
+        label: category,
+        url: photo.url,
+        name: photo.name || ""
+      });
+    });
+  });
+
+  const secPhotos =
+    allPhotoData.sectionPhotos && typeof allPhotoData.sectionPhotos === "object"
+      ? allPhotoData.sectionPhotos
+      : {};
+  Object.entries(secPhotos).forEach(([sectionName, list]) => {
+    if (!Array.isArray(list)) return;
+    list.forEach((photo, index) => {
+      if (!photo || !photo.url) return;
+      realPhotos.push({
+        id: `SECTION-${String(index + 1).padStart(3, "0")}`,
+        label: sectionName,
+        url: photo.url,
+        name: photo.name || ""
+      });
+    });
+  });
+
+  const appendixHtml = realPhotos.length
     ? `
       <div class="draft-fra-block">
         <h3>Photograph Appendix</h3>
-        ${appendix
-          .map(
-            (p) => `
-              <div style="margin-bottom:10px;">
-                <strong>${escapeHtml(String(p.photoId || ""))}</strong>
-                ${p.category ? ` — ${escapeHtml(String(p.category))}` : ""}
-                <div style="line-height:1.6;">${escapeHtml(String(p.caption || ""))}${p.observation ? " " + escapeHtml(String(p.observation)) : ""}</div>
-              </div>`
-          )
-          .join("")}
+        <div class="fra-appendix-grid">
+          ${realPhotos
+            .map((rp) => {
+              const ai = aiById[rp.id.toUpperCase()] || null;
+              const obs = ai
+                ? `${ai.caption ? escapeHtml(String(ai.caption)) : ""}${ai.observation ? " " + escapeHtml(String(ai.observation)) : ""}`
+                : "";
+              return `
+                <div class="fra-appendix-item" style="margin-bottom:16px;">
+                  <img src="${escapeHtml(rp.url)}" alt="${escapeHtml(rp.id)}" style="max-width:100%;border-radius:6px;display:block;margin-bottom:6px;">
+                  <strong>${escapeHtml(rp.id)}</strong> — ${escapeHtml(rp.label)}
+                  ${obs ? `<div style="line-height:1.6;margin-top:4px;">${obs}</div>` : ""}
+                </div>`;
+            })
+            .join("")}
+        </div>
       </div>`
     : "";
 
