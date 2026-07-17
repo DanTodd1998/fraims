@@ -995,7 +995,8 @@ function openFindingSection(encodedName) {
     <label>Assessor notes</label>
     <textarea
       id="sectionNotes"
-      placeholder="Add any notes to help generate the section assessment..."></textarea>
+      oninput="updateSectionNotes('${encodeURIComponent(sectionName)}', this.value)"
+      placeholder="Add any notes to help generate the section assessment...">${escapeHtml((FRF.assessment.findings?.sectionNotes?.[sectionName]) || "")}</textarea>
   </div>
 <div class="form-group">
   <label>📷 Section photographs</label>
@@ -1050,7 +1051,8 @@ function openFindingSection(encodedName) {
     <label>Section assessment</label>
     <textarea
       id="sectionDraft"
-      placeholder="The AI-generated section paragraph will appear here..."></textarea>
+      oninput="updateSectionDraft('${encodeURIComponent(sectionName)}', this.value)"
+      placeholder="The AI-generated section paragraph will appear here...">${escapeHtml((FRF.assessment.findings?.sectionDrafts?.[sectionName]) || "")}</textarea>
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1063,7 +1065,8 @@ function openFindingSection(encodedName) {
 
     <button
       type="button"
-      class="action-button action-button-secondary">
+      class="action-button action-button-secondary"
+      onclick="clearSectionDraft('${encodeURIComponent(sectionName)}')">
       Clear
     </button>
   </div>
@@ -1443,10 +1446,40 @@ async function generateSectionAssessment(encodedSectionName) {
 
     draftEl.value = result.draft || "";
 
+    // Persist the generated draft so it survives navigation and feeds the action plan.
+    updateSectionDraft(encodedSectionName, result.draft || "");
+
   } catch (err) {
     console.error("Section assessment generation failed:", err);
     alert(err.message || "Could not generate assessment.");
   }
+}
+
+/* ============================================================
+   SECTION NOTES & DRAFTS — persisted inside the findings column
+   so they survive navigation and are included in the assessment
+   object sent to the action plan and draft FRA generators.
+   ============================================================ */
+function updateSectionNotes(encodedName, value) {
+  const sectionName = decodeURIComponent(encodedName);
+  if (!FRF.assessment.findings) FRF.assessment.findings = {};
+  if (!FRF.assessment.findings.sectionNotes) FRF.assessment.findings.sectionNotes = {};
+  FRF.assessment.findings.sectionNotes[sectionName] = value;
+  scheduleFindingSave();
+}
+
+function updateSectionDraft(encodedName, value) {
+  const sectionName = decodeURIComponent(encodedName);
+  if (!FRF.assessment.findings) FRF.assessment.findings = {};
+  if (!FRF.assessment.findings.sectionDrafts) FRF.assessment.findings.sectionDrafts = {};
+  FRF.assessment.findings.sectionDrafts[sectionName] = value;
+  scheduleFindingSave();
+}
+
+function clearSectionDraft(encodedName) {
+  const draftEl = document.getElementById("sectionDraft");
+  if (draftEl) draftEl.value = "";
+  updateSectionDraft(encodedName, "");
 }
 function escapeHtml(value) {
   return String(value)
