@@ -1,8 +1,12 @@
 exports.handler = async (event) => {
+  const jsonHeaders = {
+    "Content-Type": "application/json",
+  };
+
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders,
       body: JSON.stringify({ error: "Method not allowed" }),
     };
   }
@@ -12,7 +16,7 @@ exports.handler = async (event) => {
   if (!apiKey) {
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders,
       body: JSON.stringify({
         error: "Server misconfigured: missing API key",
       }),
@@ -31,20 +35,26 @@ exports.handler = async (event) => {
     assessment = parsedBody.assessment;
     sectionName = parsedBody.sectionName;
     assessorNotes = parsedBody.assessorNotes || "";
-    photos = parsedBody.photos || [];
-    sectionGuidance = parsedBody.sectionGuidance || [];
+    photos = Array.isArray(parsedBody.photos)
+      ? parsedBody.photos
+      : [];
+    sectionGuidance = Array.isArray(parsedBody.sectionGuidance)
+      ? parsedBody.sectionGuidance
+      : [];
   } catch {
     return {
       statusCode: 400,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Invalid JSON body" }),
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        error: "Invalid JSON body",
+      }),
     };
   }
 
   if (!assessment || typeof assessment !== "object") {
     return {
       statusCode: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders,
       body: JSON.stringify({
         error: "Missing assessment object",
       }),
@@ -54,23 +64,91 @@ exports.handler = async (event) => {
   if (!sectionName || typeof sectionName !== "string") {
     return {
       statusCode: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders,
       body: JSON.stringify({
         error: "Missing section name",
       }),
     };
   }
 
-  const photoSummary = photos.map((photo) => ({
-    label: photo.label || "",
-    reference: photo.ref || "",
-  }));
+  try {
+    const imageBlocks = [];
 
-  const prompt = `
+    /*
+     * Limit the number of images sent in one request.
+     * This prevents oversized requests and excessive API cost.
+     */
+    const usablePhotos = photos
+      .filter((photo) => photo && typeof photo.url === "string")
+      .slice(0, 10);
+
+    for (let index = 0; index < usablePhotos.length; index += 1) {
+      const photo = usablePhotos[index];
+
+      try {
+        const imageResponse = await fetch(photo.url);
+
+        if (!imageResponse.ok) {
+          console.warn(
+            `Could not download section photo ${index + 1}:`,
+            imageResponse.status
+          );
+          continue;
+        }
+
+        const contentTypeHeader =
+          imageResponse.headers.get("content-type") || "";
+
+        const mediaType =
+          contentTypeHeader.split(";")[0].trim().toLowerCase();
+
+        const allowedMediaTypes = [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ];
+
+        if (!allowedMediaTypes.includes(mediaType)) {
+          console.warn(
+            `Skipping unsupported image type for photo ${index + 1}:`,
+            mediaType
+          );
+          continue;
+        }
+
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const base64Data =
+          Buffer.from(arrayBuffer).toString("base64");
+
+        imageBlocks.push({
+          type: "text",
+          text:
+            `Section photograph ${index + 1}` +
+            `${photo.name ? `: ${photo.name}` : ""}`,
+        });
+
+        imageBlocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: base64Data,
+          },
+        });
+      } catch (photoError) {
+        console.warn(
+          `Could not process section photo ${index + 1}:`,
+          photoError
+        );
+      }
+    }
+
+    const prompt = `
 You are assisting a competent fire risk assessor in the United Kingdom.
 
 Draft one professional assessment paragraph for the following fire risk
-assessment section:
+assessment section.
 
 SECTION:
 ${sectionName}
@@ -78,54 +156,66 @@ ${sectionName}
 ASSESSOR NOTES:
 ${assessorNotes || "No assessor notes have been entered."}
 
-SECTION GUIDANCE:
+SECTION PHOTOGRAPH GUIDANCE:
 ${JSON.stringify(sectionGuidance, null, 2)}
-
-AVAILABLE PHOTOGRAPH REFERENCES:
-${JSON.stringify(photoSummary, null, 2)}
 
 ASSESSMENT INFORMATION:
 ${JSON.stringify(assessment, null, 2)}
 
-Rules:
+Instructions:
 
-- Use only the information supplied.
-- Do not invent facts, dimensions, materials, controls or defects.
-- Do not claim to have visually inspected a photograph.
+- Use only the supplied assessment information, assessor notes and section photographs.
+- Review the supplied photographs as visual evidence, but remain cautious about anything that cannot be confirmed from the image.
+- Clearly distinguish visible observations from assumptions or missing evidence.
+- Do not invent dimensions, materials, certification, test results, concealed construction or maintenance history.
+- Do not treat a photograph as proof of full compliance.
 - Do not make a final statutory compliance judgement.
+- Where a visible concern appears relevant, describe it objectively and state where further confirmation or inspection may be required.
+- If no usable photographs were supplied, rely only on the written information and identify relevant limitations.
 - Write in professional UK fire risk assessment language.
 - Produce one coherent paragraph suitable for an FRA report.
-- Clearly identify material limitations or missing information where relevant.
 - Do not include headings, bullet points, markdown or explanatory commentary.
 - Return plain text only.
 `.trim();
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const messageContent = [
+      {
+        type: "text",
+        text: prompt,
       },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 700,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
-    });
+      ...imageBlocks,
+    ];
+
+    const response = await fetch(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-5",
+          max_tokens: 900,
+          messages: [
+            {
+              role: "user",
+              content: messageContent,
+            },
+          ],
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
+      console.error("Anthropic API error:", data);
+
       return {
         statusCode: response.status,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders,
         body: JSON.stringify({
           error: "Anthropic API error",
           detail: data,
@@ -142,7 +232,7 @@ Rules:
     if (!draft) {
       return {
         statusCode: 502,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders,
         body: JSON.stringify({
           error: "AI returned an empty response",
         }),
@@ -151,17 +241,23 @@ Rules:
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draft }),
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        draft,
+        imagesProcessed: imageBlocks.filter(
+          (block) => block.type === "image"
+        ).length,
+      }),
     };
   } catch (error) {
     console.error("Anthropic request failed:", error);
 
     return {
       statusCode: 502,
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders,
       body: JSON.stringify({
-        error: "Failed to reach Anthropic API",
+        error: "Failed to generate the section assessment",
+        detail: error.message || "Unknown error",
       }),
     };
   }
