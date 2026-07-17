@@ -332,6 +332,11 @@ async function showAssessmentWorkspace() {
     pollDraftFRA(assessment.id);
   }
 
+  // If a PDF is mid-generation, resume polling for it too.
+  if (assessment.generatedReport?.pdfStatus === "generating") {
+    pollFraPdf(assessment.id);
+  }
+
   document.querySelector(".container").innerHTML = `
     <section class="welcome">
       <h2>${escapeHtml(assessment.propertyName || "New Assessment")}</h2>
@@ -604,14 +609,88 @@ function renderDraftFRASection(assessment) {
     ? new Date(report.updatedAt).toLocaleString()
     : "";
 
+  // PDF controls: state depends on report.pdfStatus.
+  let pdfControls;
+  if (report.pdfStatus === "generating") {
+    pdfControls = `<p class="loading">Generating PDF… this updates automatically when ready.</p>`;
+  } else if (report.pdfStatus === "ready" && report.pdfUrl) {
+    pdfControls = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <a class="action-button action-button-primary" href="${escapeHtml(report.pdfUrl)}" target="_blank" rel="noopener" style="text-decoration:none;">⬇️ Download PDF</a>
+        <button type="button" class="action-button action-button-secondary" onclick="generateFraPdf()">Regenerate PDF</button>
+      </div>`;
+  } else if (report.pdfStatus === "error") {
+    pdfControls = `
+      <p class="upload-status error">PDF generation failed: ${escapeHtml(report.pdfError || "unknown error")}.</p>
+      <button type="button" class="action-button action-button-primary" onclick="generateFraPdf()">📄 Try again</button>`;
+  } else {
+    pdfControls = `<button type="button" id="generatePdfBtn" class="action-button action-button-primary" onclick="generateFraPdf()">📄 Create PDF</button>`;
+  }
+
   return `
     <section class="welcome" id="draftFraSection">
       <h2>Draft Fire Risk Assessment</h2>
       <p>AI-generated draft for assessor review${generatedWhen ? ` — generated ${escapeHtml(generatedWhen)}` : ""}. Review carefully; the assessor remains responsible for the final report.</p>
+      <div style="margin:8px 0 16px;">${pdfControls}</div>
       ${narrative}
       ${recommendationsHtml}
       ${appendixHtml}
     </section>`;
+}
+
+async function generateFraPdf() {
+  const assessment = await Store.loadCurrent();
+  if (!assessment) { alert("No assessment loaded."); return; }
+
+  const report = assessment.generatedReport || {};
+  if (report.status !== "ready" || !report.draft) {
+    alert("Please generate the draft Fire Risk Assessment first.");
+    return;
+  }
+
+  try {
+    // Mark PDF as generating and re-render so the user sees progress.
+    assessment.generatedReport = { ...report, pdfStatus: "generating" };
+    await Store.save(assessment);
+    showAssessmentWorkspace();
+
+    fetch("/.netlify/functions/generate-pdf-background", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assessment })
+    }).catch((err) => console.error("Could not start PDF generation:", err));
+
+    pollFraPdf(assessment.id);
+  } catch (err) {
+    console.error("Generate PDF failed:", err);
+    alert("Could not start PDF generation.");
+  }
+}
+
+let fraPdfPollTimer = null;
+
+function pollFraPdf(assessmentId, attempt = 0) {
+  const MAX_ATTEMPTS = 60; // ~3 minutes at 3s
+  if (fraPdfPollTimer) clearTimeout(fraPdfPollTimer);
+
+  fraPdfPollTimer = setTimeout(async () => {
+    if (Store.currentId !== assessmentId) return;
+
+    let latest;
+    try {
+      latest = await Store.load(assessmentId);
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS) pollFraPdf(assessmentId, attempt + 1);
+      return;
+    }
+
+    const status = (latest.generatedReport || {}).pdfStatus;
+    if (status === "ready" || status === "error") {
+      if (Store.currentId === assessmentId) showAssessmentWorkspace();
+      return;
+    }
+    if (attempt < MAX_ATTEMPTS) pollFraPdf(assessmentId, attempt + 1);
+  }, 3000);
 }
 
 function showDashboard() { location.reload(); }
