@@ -531,7 +531,127 @@ document.querySelector(".container").innerHTML = `
   </section>
 `;
 }
+async function removeSectionPhoto(encodedSectionName, photoIndex) {
+  const sectionName = decodeURIComponent(encodedSectionName);
+  const assessment = await Store.loadCurrent();
 
+  if (!assessment?.sectionPhotos?.[sectionName]) {
+    return;
+  }
+
+  const photo = assessment.sectionPhotos[sectionName][photoIndex];
+
+  if (!photo) {
+    return;
+  }
+
+  const confirmed = confirm("Remove this photograph?");
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    if (photo.path) {
+      const { error: storageError } = await supabaseClient.storage
+        .from(PHOTO_BUCKET)
+        .remove([photo.path]);
+
+      if (storageError) {
+        throw storageError;
+      }
+    }
+
+    assessment.sectionPhotos[sectionName].splice(photoIndex, 1);
+
+    await Store.save(assessment);
+
+    showInspectionSection(sectionName);
+  } catch (err) {
+    console.error("Could not remove section photograph:", err);
+    alert("Could not remove the photograph.");
+  }
+}
+async function uploadSectionPhotos(encodedSectionName) {
+  const sectionName = decodeURIComponent(encodedSectionName);
+  const assessment = await Store.loadCurrent();
+
+  if (!assessment) {
+    alert("No assessment is currently open.");
+    showDashboard();
+    return;
+  }
+
+  const statusEl = document.getElementById("sectionPhotoStatus");
+  const fileInput = document.getElementById("sectionPhotoInput");
+  const files = Array.from(fileInput?.files || []);
+
+  if (!files.length) {
+    setStatus(statusEl, "Choose at least one photograph first.", "error");
+    return;
+  }
+
+  if (!assessment.sectionPhotos) {
+    assessment.sectionPhotos = {};
+  }
+
+  if (!assessment.sectionPhotos[sectionName]) {
+    assessment.sectionPhotos[sectionName] = [];
+  }
+
+  setStatus(statusEl, "Uploading…", "");
+
+  try {
+    for (const file of files) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const safeSection = sectionName.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+      const path =
+        `${assessment.id}/sections/${safeSection}/${Date.now()}-${safeName}`;
+
+      const { error: uploadError } = await supabaseClient.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabaseClient.storage
+        .from(PHOTO_BUCKET)
+        .getPublicUrl(path);
+
+      assessment.sectionPhotos[sectionName].push({
+        path,
+        url: urlData.publicUrl,
+        name: file.name,
+        uploadedAt: new Date().toISOString()
+      });
+    }
+
+    await Store.save(assessment);
+
+    setStatus(
+      statusEl,
+      `${files.length} photograph${files.length === 1 ? "" : "s"} uploaded.`,
+      "success"
+    );
+
+    fileInput.value = "";
+    showInspectionSection(sectionName);
+  } catch (err) {
+    console.error(err);
+
+    setStatus(
+      statusEl,
+      "Upload failed: " + (err.message || "unknown error"),
+      "error"
+    );
+  }
+}
 async function uploadPhoto(categoryKey) {
   const assessment = await Store.loadCurrent();
   if (!assessment) { alert("No assessment is currently open."); showDashboard(); return; }
@@ -784,7 +904,53 @@ function openFindingSection(encodedName) {
       id="sectionNotes"
       placeholder="Add any notes to help generate the section assessment..."></textarea>
   </div>
+<div class="form-group">
+  <label>📷 Section photographs</label>
 
+  <div class="photo-upload-row">
+    <input
+      type="file"
+      accept="image/*"
+      multiple
+      id="sectionPhotoInput">
+
+    <button
+      type="button"
+      class="action-button action-button-primary"
+      onclick="uploadSectionPhotos('${encodeURIComponent(sectionName)}')">
+      Upload photographs
+    </button>
+  </div>
+
+  <p
+    class="upload-status"
+    id="sectionPhotoStatus"></p>
+
+<div
+  class="photo-thumbs"
+  id="sectionPhotoThumbs">
+  ${
+    ((FRF.assessment.sectionPhotos || {})[sectionName] || []).length
+      ? ((FRF.assessment.sectionPhotos || {})[sectionName] || [])
+          .map((photo, index) => `
+            <div class="photo-thumb">
+              <img
+                src="${escapeHtml(photo.url)}"
+                alt="${escapeHtml(sectionName)} photograph">
+
+              <button
+                type="button"
+                class="remove-photo"
+                title="Remove"
+                onclick="removeSectionPhoto('${encodeURIComponent(sectionName)}', ${index})">
+                ×
+              </button>
+            </div>
+          `)
+          .join("")
+      : `<p class="photo-empty">No photographs uploaded yet.</p>`
+  }
+</div>
   <div class="form-group">
     <label>Section assessment</label>
     <textarea
