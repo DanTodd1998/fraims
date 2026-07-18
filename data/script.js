@@ -326,6 +326,7 @@ async function showAssessmentWorkspace() {
 
   // Reset the action plan working copy so cell edits hydrate from fresh data.
   AP = { assessment: null, saveTimer: null };
+  RISK = { assessment: null, saveTimer: null };
 
   // If a draft FRA is mid-generation (e.g. after a page reload), resume polling.
   if (assessment.generatedReport?.status === "generating") {
@@ -359,6 +360,7 @@ async function showAssessmentWorkspace() {
     </section>
     ${renderActionPlanSection(assessment)}
     ${renderDraftFRASection(assessment)}
+    ${renderRiskEvaluationSection(assessment)}
 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
 
   <button
@@ -691,6 +693,231 @@ function pollFraPdf(assessmentId, attempt = 0) {
     }
     if (attempt < MAX_ATTEMPTS) pollFraPdf(assessmentId, attempt + 1);
   }, 3000);
+}
+
+/* ============================================================
+   RISK EVALUATION — PAS 79 / HSG65 5-point rating.
+   The AI suggests a rating during Generate FRA; the assessor
+   reviews, can override likelihood/severity, and confirms.
+   Persists in assessment.riskEvaluation (risk_evaluation column).
+   ============================================================ */
+const RISK_LIKELIHOODS = ["Low", "Medium", "High"];
+const RISK_SEVERITIES = ["Slight harm", "Moderate harm", "Extreme harm"];
+const RISK_RATINGS = ["Trivial", "Tolerable", "Moderate", "Substantial", "Intolerable"];
+
+// Standard PAS 79 / HSG65 matrix: likelihood (row) x severity (col) -> rating.
+function riskMatrixRating(likelihood, severity) {
+  const L = RISK_LIKELIHOODS.indexOf(likelihood);
+  const S = RISK_SEVERITIES.indexOf(severity);
+  if (L === -1 || S === -1) return "";
+  // rows = Low/Medium/High, cols = Slight/Moderate/Extreme
+  const matrix = [
+    ["Trivial", "Tolerable", "Moderate"],       // Low
+    ["Tolerable", "Moderate", "Substantial"],   // Medium
+    ["Moderate", "Substantial", "Intolerable"]  // High
+  ];
+  return matrix[L][S];
+}
+
+function renderRiskEvaluationSection(assessment) {
+  const report = assessment.generatedReport || {};
+  // Prefer the confirmable copy; otherwise seed from the AI suggestion in the draft.
+  let re = assessment.riskEvaluation && Object.keys(assessment.riskEvaluation).length
+    ? assessment.riskEvaluation
+    : null;
+
+  const aiSuggestion =
+    report.draft && report.draft.riskEvaluation ? report.draft.riskEvaluation : null;
+
+  // Nothing to show until a draft (with a suggestion) exists or a rating is saved.
+  if (!re && !aiSuggestion) return "";
+
+  if (!re && aiSuggestion) {
+    re = {
+      likelihood: aiSuggestion.likelihood || "",
+      severity: aiSuggestion.severity || "",
+      rating: aiSuggestion.rating || riskMatrixRating(aiSuggestion.likelihood, aiSuggestion.severity),
+      rationale: aiSuggestion.rationale || "",
+      reviewPeriod: aiSuggestion.reviewPeriod || "",
+      reviewTriggers: aiSuggestion.reviewTriggers || "",
+      confirmed: false
+    };
+  }
+
+  const likelihoodOpts = RISK_LIKELIHOODS.map(
+    (l) => `<option value="${l}" ${re.likelihood === l ? "selected" : ""}>${l}</option>`
+  ).join("");
+  const severityOpts = RISK_SEVERITIES.map(
+    (s) => `<option value="${s}" ${re.severity === s ? "selected" : ""}>${s}</option>`
+  ).join("");
+
+  const rating = re.rating || riskMatrixRating(re.likelihood, re.severity);
+  const ratingColour = {
+    Trivial: "#2e7d32",
+    Tolerable: "#558b2f",
+    Moderate: "#f9a825",
+    Substantial: "#ef6c00",
+    Intolerable: "#c62828"
+  }[rating] || "#555";
+
+  const confirmedBadge = re.confirmed
+    ? `<span class="status-badge" style="background:#2e7d32;color:#fff;">Confirmed by assessor</span>`
+    : `<span class="status-badge" style="background:#f9a825;color:#111;">AI-suggested — review &amp; confirm</span>`;
+
+  return `
+    <section class="welcome" id="riskEvaluationSection">
+      <div class="save-indicator" id="riskSaveIndicator"></div>
+      <h2>Overall Risk Evaluation</h2>
+      <p>${confirmedBadge}</p>
+      <p style="margin-top:6px;">The overall fire risk rating is determined by the assessor using the risk matrix. The AI provides a starting suggestion; you remain responsible for the final rating.</p>
+
+      <div class="field-row" style="margin-top:12px;">
+        <div class="form-group">
+          <label>Likelihood of fire</label>
+          <select id="riskLikelihood" onchange="updateRiskField('likelihood', this.value)">
+            <option value="">—</option>
+            ${likelihoodOpts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Severity of outcome</label>
+          <select id="riskSeverity" onchange="updateRiskField('severity', this.value)">
+            <option value="">—</option>
+            ${severityOpts}
+          </select>
+        </div>
+      </div>
+
+      <div style="margin:10px 0 4px;">
+        <span style="font-size:0.9rem;color:#555;">Calculated overall risk rating:</span>
+      </div>
+      <div id="riskRatingDisplay" style="display:inline-block;padding:8px 16px;border-radius:6px;font-weight:bold;color:#fff;font-size:1.1rem;background:${ratingColour};">
+        ${escapeHtml(rating || "Select likelihood and severity")}
+      </div>
+
+      ${re.rationale ? `
+      <div class="form-group" style="margin-top:14px;">
+        <label>Rationale (AI-suggested — editable)</label>
+        <textarea oninput="updateRiskField('rationale', this.value)">${escapeHtml(re.rationale)}</textarea>
+      </div>` : ""}
+
+      <div class="field-row">
+        <div class="form-group">
+          <label>Review period</label>
+          <input value="${escapeHtml(re.reviewPeriod || "")}" oninput="updateRiskField('reviewPeriod', this.value)" placeholder="e.g. 12 months">
+        </div>
+        <div class="form-group">
+          <label>Review triggers</label>
+          <input value="${escapeHtml(re.reviewTriggers || "")}" oninput="updateRiskField('reviewTriggers', this.value)" placeholder="e.g. material change, fire, refurbishment">
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <button type="button" class="action-button action-button-primary" onclick="confirmRiskEvaluation()">
+          ${re.confirmed ? "Update confirmed rating" : "✅ Confirm rating"}
+        </button>
+      </div>
+    </section>`;
+}
+
+// Working copy for risk evaluation edits.
+let RISK = { assessment: null, saveTimer: null };
+
+async function ensureRiskWorkingCopy() {
+  if (!RISK.assessment) {
+    RISK.assessment = await Store.loadCurrent();
+  }
+  if (RISK.assessment && (!RISK.assessment.riskEvaluation || !Object.keys(RISK.assessment.riskEvaluation).length)) {
+    // Seed from the AI suggestion on first edit if not yet saved.
+    const sugg =
+      RISK.assessment.generatedReport &&
+      RISK.assessment.generatedReport.draft &&
+      RISK.assessment.generatedReport.draft.riskEvaluation
+        ? RISK.assessment.generatedReport.draft.riskEvaluation
+        : {};
+    RISK.assessment.riskEvaluation = {
+      likelihood: sugg.likelihood || "",
+      severity: sugg.severity || "",
+      rating: sugg.rating || riskMatrixRating(sugg.likelihood, sugg.severity),
+      rationale: sugg.rationale || "",
+      reviewPeriod: sugg.reviewPeriod || "",
+      reviewTriggers: sugg.reviewTriggers || "",
+      confirmed: false
+    };
+  }
+  return RISK.assessment;
+}
+
+async function updateRiskField(field, value) {
+  const assessment = await ensureRiskWorkingCopy();
+  if (!assessment) return;
+  assessment.riskEvaluation[field] = value;
+
+  // Recalculate rating live when likelihood or severity changes.
+  if (field === "likelihood" || field === "severity") {
+    const newRating = riskMatrixRating(
+      assessment.riskEvaluation.likelihood,
+      assessment.riskEvaluation.severity
+    );
+    assessment.riskEvaluation.rating = newRating;
+    const disp = document.getElementById("riskRatingDisplay");
+    if (disp) {
+      const colour = {
+        Trivial: "#2e7d32", Tolerable: "#558b2f", Moderate: "#f9a825",
+        Substantial: "#ef6c00", Intolerable: "#c62828"
+      }[newRating] || "#555";
+      disp.textContent = newRating || "Select likelihood and severity";
+      disp.style.background = colour;
+    }
+  }
+
+  // Any manual change means it's no longer just the AI's untouched suggestion,
+  // but it still needs explicit confirmation, so we leave confirmed as-is until
+  // the assessor clicks Confirm.
+  scheduleRiskSave();
+}
+
+function scheduleRiskSave() {
+  const ind = document.getElementById("riskSaveIndicator");
+  if (ind) { ind.textContent = "Editing…"; ind.className = "save-indicator saving"; }
+  if (RISK.saveTimer) clearTimeout(RISK.saveTimer);
+  RISK.saveTimer = setTimeout(commitRiskSave, 1000);
+}
+
+async function commitRiskSave() {
+  const ind = document.getElementById("riskSaveIndicator");
+  if (ind) { ind.textContent = "Saving…"; ind.className = "save-indicator saving"; }
+  if (!RISK.assessment) return;
+  try {
+    const saved = await Store.save(RISK.assessment);
+    RISK.assessment.updatedAt = saved.updatedAt;
+    if (ind) { ind.textContent = "Saved ✓"; ind.className = "save-indicator saved"; }
+  } catch (err) {
+    console.error("Risk evaluation save failed:", err);
+    if (ind) { ind.textContent = "Save failed — check connection."; ind.className = "save-indicator error"; }
+  }
+}
+
+async function confirmRiskEvaluation() {
+  const assessment = await ensureRiskWorkingCopy();
+  if (!assessment) return;
+
+  const re = assessment.riskEvaluation;
+  if (!re.likelihood || !re.severity) {
+    alert("Please select both a likelihood and a severity before confirming.");
+    return;
+  }
+  re.rating = riskMatrixRating(re.likelihood, re.severity);
+  re.confirmed = true;
+  re.confirmedAt = new Date().toISOString();
+
+  try {
+    await Store.save(assessment);
+    showAssessmentWorkspace();
+  } catch (err) {
+    console.error("Could not confirm risk rating:", err);
+    alert("Could not save the confirmed rating.");
+  }
 }
 
 function showDashboard() { location.reload(); }

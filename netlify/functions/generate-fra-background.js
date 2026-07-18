@@ -181,7 +181,15 @@ Return valid JSON only, using exactly this structure:
       "caption": "",
       "observation": ""
     }
-  ]
+  ],
+  "riskEvaluation": {
+    "likelihood": "",
+    "severity": "",
+    "rating": "",
+    "rationale": "",
+    "reviewPeriod": "",
+    "reviewTriggers": ""
+  }
 }
 
 Requirements:
@@ -194,6 +202,15 @@ Requirements:
 - Include every uploaded photograph in photoAppendix.
 - Keep the main report professional and readable.
 - Keep all output editable by the assessor.
+
+Risk evaluation (this is a SUGGESTION for the assessor to review and confirm):
+- "likelihood" must be exactly one of: "Low", "Medium", "High".
+- "severity" must be exactly one of: "Slight harm", "Moderate harm", "Extreme harm".
+- "rating" is the overall fire risk and must be exactly one of: "Trivial", "Tolerable", "Moderate", "Substantial", "Intolerable". Derive it from likelihood and severity using a standard PAS 79 / HSG65 risk matrix.
+- "rationale" is 1-3 sentences explaining the suggested rating with reference to the significant findings and action plan. Do not overstate certainty.
+- "reviewPeriod" is a suggested maximum period before the next review (e.g. "12 months").
+- "reviewTriggers" briefly lists events that would prompt an earlier review.
+- This rating is provisional and must be confirmed by the competent assessor; never present it as final.
 - Return JSON only, with no markdown or explanatory text.
 
 Complete assessment information:

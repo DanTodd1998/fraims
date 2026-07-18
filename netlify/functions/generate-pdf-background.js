@@ -186,6 +186,10 @@ exports.handler = async (event) => {
             [{ text: "Assessment date", bold: true }, esc(assessment.assessmentDate)],
             [{ text: "Status", bold: true }, esc(assessment.status)],
             [{ text: "Reference", bold: true }, esc(assessment.propertyReference)],
+            [
+              { text: "Overall risk rating", bold: true },
+              esc((assessment.riskEvaluation && assessment.riskEvaluation.rating) || "Not yet rated"),
+            ],
           ],
         },
         layout: "noBorders",
@@ -314,6 +318,37 @@ exports.handler = async (event) => {
       }
     }
 
+    // ---- Risk evaluation ----
+    const re = assessment.riskEvaluation || {};
+    const riskContent = [];
+    if (re.rating || re.likelihood || re.severity) {
+      riskContent.push({ text: "Overall Risk Evaluation", fontSize: 14, bold: true, margin: [0, 16, 0, 6], pageBreak: "before" });
+      riskContent.push({
+        table: {
+          widths: ["auto", "*"],
+          body: [
+            [{ text: "Likelihood of fire", bold: true }, esc(re.likelihood)],
+            [{ text: "Severity of outcome", bold: true }, esc(re.severity)],
+            [{ text: "Overall risk rating", bold: true }, { text: esc(re.rating), bold: true }],
+            [{ text: "Review period", bold: true }, esc(re.reviewPeriod)],
+            [{ text: "Review triggers", bold: true }, esc(re.reviewTriggers)],
+            [{ text: "Status", bold: true }, re.confirmed ? "Confirmed by assessor" : "Provisional — not yet confirmed"],
+          ],
+        },
+        layout: "lightHorizontalLines",
+        fontSize: 10,
+        margin: [0, 0, 0, 8],
+      });
+      if (re.rationale) {
+        riskContent.push({ text: "Rationale", bold: true, fontSize: 11, margin: [0, 6, 0, 2] });
+        riskContent.push({ text: esc(re.rationale), fontSize: 10, lineHeight: 1.3, margin: [0, 0, 0, 6] });
+      }
+      riskContent.push({
+        text: "The overall risk rating is determined by the assessor using a PAS 79 / HSG65 risk matrix.",
+        italics: true, color: "#666", fontSize: 9,
+      });
+    }
+
     // ---- Assessor declaration ----
     const declaration = [
       { text: "Assessor Declaration", fontSize: 14, bold: true, margin: [0, 16, 0, 6], pageBreak: "before" },
@@ -359,6 +394,7 @@ exports.handler = async (event) => {
         ...cover,
         ...narrative,
         ...actionPlanContent,
+        ...riskContent,
         ...appendixContent,
         ...declaration,
       ],
