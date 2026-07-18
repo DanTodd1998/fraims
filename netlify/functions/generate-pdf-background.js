@@ -180,35 +180,60 @@ exports.handler = async (event) => {
     const esc = (v) => (v === undefined || v === null ? "" : String(v));
 
     // ---- Cover page ----
+    // Avoid the address repeating the property name on its first line.
+    const propName = esc(assessment.propertyName) || "Untitled Property";
+    let addr = esc(assessment.propertyAddress);
+    if (addr && propName && addr.indexOf(propName) === 0) {
+      addr = addr.slice(propName.length).replace(/^[\s,]+/, "");
+    }
+
+    const ratingText = esc(
+      (assessment.riskEvaluation && assessment.riskEvaluation.rating) || "Not yet rated"
+    );
+
     const cover = [
-      // London & Kent banner strip, full content width, flush to the top margin.
-      { image: LK_BANNER, width: 515, margin: [0, -20, 0, 0] },
-      { text: "Fire Risk Assessment", fontSize: 26, bold: true, color: LK_NAVY, margin: [0, 80, 0, 8] },
-      { text: esc(assessment.propertyName) || "Untitled Property", fontSize: 16, margin: [0, 0, 0, 4] },
-      { text: esc(assessment.propertyAddress), fontSize: 12, color: "#444", margin: [0, 0, 0, 30] },
+      // Full-bleed banner: negative side margins cancel the 40pt page margins so
+      // the strip runs edge to edge across the top of the page.
+      { image: LK_BANNER, width: 595, margin: [-40, -60, -40, 0] },
+
+      { text: "Fire Risk Assessment", fontSize: 30, bold: true, color: LK_NAVY, alignment: "center", margin: [0, 150, 0, 6] },
+      { text: propName, fontSize: 18, alignment: "center", margin: [0, 0, 0, 2] },
+      addr
+        ? { text: addr, fontSize: 12, color: "#555", alignment: "center", margin: [0, 0, 0, 40] }
+        : { text: "", margin: [0, 0, 0, 40] },
+
+      // Centered details block: a fixed-width table centered on the page.
       {
         table: {
-          widths: ["auto", "*"],
+          widths: [130, 200],
           body: [
-            [{ text: "Client", bold: true }, esc(assessment.clientName)],
-            [{ text: "Assessor", bold: true }, esc(assessment.assessor)],
-            [{ text: "Assessment date", bold: true }, esc(assessment.assessmentDate)],
-            [{ text: "Status", bold: true }, esc(assessment.status)],
-            [{ text: "Reference", bold: true }, esc(assessment.propertyReference)],
-            [
-              { text: "Overall risk rating", bold: true },
-              esc((assessment.riskEvaluation && assessment.riskEvaluation.rating) || "Not yet rated"),
-            ],
+            [{ text: "Client", bold: true, color: LK_NAVY }, esc(assessment.clientName)],
+            [{ text: "Assessor", bold: true, color: LK_NAVY }, esc(assessment.assessor)],
+            [{ text: "Assessment date", bold: true, color: LK_NAVY }, esc(assessment.assessmentDate)],
+            [{ text: "Status", bold: true, color: LK_NAVY }, esc(assessment.status)],
+            [{ text: "Reference", bold: true, color: LK_NAVY }, esc(assessment.propertyReference) || "—"],
+            [{ text: "Overall risk rating", bold: true, color: LK_NAVY }, { text: ratingText, bold: true }],
           ],
         },
-        layout: "noBorders",
+        layout: {
+          hLineWidth: () => 0,
+          vLineWidth: () => 0,
+          paddingTop: () => 5,
+          paddingBottom: () => 5,
+          paddingLeft: () => 6,
+          paddingRight: () => 6,
+        },
+        alignment: "center",
+        margin: [0, 0, 0, 50],
       },
+
       {
         text: "AI-assisted draft for assessor review. The assessor remains responsible for reviewing, editing and approving the final report.",
         italics: true,
-        color: "#666",
+        color: "#888",
         fontSize: 9,
-        margin: [0, 40, 0, 0],
+        alignment: "center",
+        margin: [60, 0, 60, 0],
       },
       { text: "", pageBreak: "after" },
     ];
