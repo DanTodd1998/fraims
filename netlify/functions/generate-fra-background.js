@@ -201,6 +201,7 @@ Requirements:
 - Refer to photographs using the supplied photograph IDs.
 - Include every uploaded photograph in photoAppendix.
 - Keep the main report professional and readable.
+- Be concise and avoid unnecessary repetition; each section should be substantive but not padded.
 - Keep all output editable by the assessor.
 
 Risk evaluation (this is a SUGGESTION for the assessor to review and confirm):
@@ -227,7 +228,7 @@ ${JSON.stringify(assessment, null, 2)}
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 16000,
+        max_tokens: 24000,
         messages: [
           {
             role: "user",
@@ -243,11 +244,25 @@ ${JSON.stringify(assessment, null, 2)}
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Anthropic API error:", data);
+      console.error("Anthropic API error:", response.status, JSON.stringify(data));
+      // Surface the real reason so the assessor can see what happened.
+      const apiMsg =
+        (data && data.error && data.error.message) ||
+        (data && data.message) ||
+        `HTTP ${response.status}`;
+      let friendly = `Anthropic API error: ${apiMsg}`;
+      if (response.status === 429) {
+        friendly = "The AI service is busy or rate-limited right now. Please wait a moment and try again.";
+      } else if (response.status === 529) {
+        friendly = "The AI service is temporarily overloaded. Please try again shortly.";
+      } else if (response.status === 401) {
+        friendly = "AI authentication failed — the API key may be invalid. Check the ANTHROPIC_API_KEY setting.";
+      }
       await writeReport(assessment.id, {
         status: "error",
-        error: "Anthropic API error",
+        error: friendly,
         detail: data,
+        httpStatus: response.status,
         updatedAt: new Date().toISOString(),
       });
       return { statusCode: 502 };
