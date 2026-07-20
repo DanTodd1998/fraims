@@ -349,13 +349,9 @@ async function showAssessmentWorkspace() {
         <div class="icon">🏢</div><h3>Building Details</h3>
         <p>Record the construction, use, occupancy and fire strategy.</p>
       </button>
-      <button class="dashboard-card" onclick="showPhotographs()">
-        <div class="icon">📷</div><h3>Photographs</h3>
-        <p>Upload and categorise site photographs.</p>
-      </button>
       <button class="dashboard-card" onclick="showFireRiskFindings()">
         <div class="icon">🔥</div><h3>Fire Risk Findings</h3>
-        <p>Record hazards, controls and significant findings.</p>
+        <p>Record hazards, controls and significant findings. Upload section photographs here.</p>
       </button>
     </section>
     ${renderActionPlanSection(assessment)}
@@ -369,6 +365,12 @@ async function showAssessmentWorkspace() {
     ✨ Generate Draft FRA
   </button>
 
+  ${
+    assessment.status === "Completed"
+      ? `<button class="action-button action-button-secondary" onclick="reopenAssessment()">↩️ Reopen as Draft</button>`
+      : `<button class="action-button action-button-primary" onclick="markAssessmentComplete()">✅ Mark as Complete</button>`
+  }
+
   <button
     class="action-button action-button-secondary"
     onclick="showDashboard()">
@@ -376,6 +378,52 @@ async function showAssessmentWorkspace() {
   </button>
 
 </div>  `;
+}
+
+async function markAssessmentComplete() {
+  const assessment = await Store.loadCurrent();
+  if (!assessment) { alert("No assessment is currently open."); showDashboard(); return; }
+
+  const re = assessment.riskEvaluation || {};
+  if (!re.confirmed || !re.rating) {
+    alert("Please confirm the overall risk rating in the Overall Risk Evaluation section before marking this assessment complete.");
+    return;
+  }
+
+  if (!confirm("Mark this assessment as Complete? It will move to Completed Assessments.")) {
+    return;
+  }
+
+  assessment.status = "Completed";
+  assessment.approval = {
+    ...(assessment.approval || {}),
+    approvedBy: assessment.assessor || "",
+    approvedAt: new Date().toISOString(),
+    riskRating: re.rating
+  };
+
+  try {
+    await Store.save(assessment);
+    showAssessmentWorkspace();
+  } catch (err) {
+    console.error("Could not mark complete:", err);
+    alert("Could not mark the assessment complete.");
+  }
+}
+
+async function reopenAssessment() {
+  const assessment = await Store.loadCurrent();
+  if (!assessment) { alert("No assessment is currently open."); showDashboard(); return; }
+  if (!confirm("Reopen this assessment as a Draft for further editing?")) return;
+
+  assessment.status = "Draft";
+  try {
+    await Store.save(assessment);
+    showAssessmentWorkspace();
+  } catch (err) {
+    console.error("Could not reopen:", err);
+    alert("Could not reopen the assessment.");
+  }
 }
 
 // Builds the editable Action Plan block shown at the bottom of the workspace,
