@@ -327,6 +327,7 @@ async function showAssessmentWorkspace() {
   // Reset the action plan working copy so cell edits hydrate from fresh data.
   AP = { assessment: null, saveTimer: null };
   RISK = { assessment: null, saveTimer: null };
+  REPORT_DETAILS = { assessment: null, saveTimer: null };
 
   // If a draft FRA is mid-generation (e.g. after a page reload), resume polling.
   if (assessment.generatedReport?.status === "generating") {
@@ -354,9 +355,11 @@ async function showAssessmentWorkspace() {
         <p>Record hazards, controls and significant findings. Upload section photographs here.</p>
       </button>
     </section>
+    ${renderReportDetailsSection(assessment)}
     ${renderActionPlanSection(assessment)}
     ${renderDraftFRASection(assessment)}
     ${renderRiskEvaluationSection(assessment)}
+    ${renderPdfSection(assessment)}
 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
 
   <button
@@ -659,7 +662,22 @@ function renderDraftFRASection(assessment) {
     ? new Date(report.updatedAt).toLocaleString()
     : "";
 
-  // PDF controls: state depends on report.pdfStatus.
+  return `
+    <section class="welcome" id="draftFraSection">
+      <h2>Draft Fire Risk Assessment</h2>
+      <p>AI-generated draft for assessor review${generatedWhen ? ` — generated ${escapeHtml(generatedWhen)}` : ""}. Review carefully; the assessor remains responsible for the final report.</p>
+      ${narrative}
+      ${recommendationsHtml}
+      ${appendixHtml}
+    </section>`;
+}
+
+// Renders the PDF controls independently of the AI draft, so a PDF can be
+// created from the saved assessment data in a fully manual workflow. The
+// button state reflects report.pdfStatus.
+function renderPdfSection(assessment) {
+  const report = assessment.generatedReport || {};
+
   let pdfControls;
   if (report.pdfStatus === "generating") {
     pdfControls = `<p class="loading">Generating PDF… this updates automatically when ready.</p>`;
@@ -678,13 +696,10 @@ function renderDraftFRASection(assessment) {
   }
 
   return `
-    <section class="welcome" id="draftFraSection">
-      <h2>Draft Fire Risk Assessment</h2>
-      <p>AI-generated draft for assessor review${generatedWhen ? ` — generated ${escapeHtml(generatedWhen)}` : ""}. Review carefully; the assessor remains responsible for the final report.</p>
-      <div style="margin:8px 0 16px;">${pdfControls}</div>
-      ${narrative}
-      ${recommendationsHtml}
-      ${appendixHtml}
+    <section class="welcome" id="pdfSection">
+      <h2>Report PDF</h2>
+      <p>Build the London &amp; Kent branded PDF directly from the saved assessment data, photographs and risk evaluation. This does not require the AI draft to have been generated.</p>
+      <div style="margin:8px 0 4px;">${pdfControls}</div>
     </section>`;
 }
 
@@ -693,13 +708,10 @@ async function generateFraPdf() {
   if (!assessment) { alert("No assessment loaded."); return; }
 
   const report = assessment.generatedReport || {};
-  if (report.status !== "ready" || !report.draft) {
-    alert("Please generate the draft Fire Risk Assessment first.");
-    return;
-  }
 
   try {
     // Mark PDF as generating and re-render so the user sees progress.
+    // Preserve any existing report contents (e.g. an AI draft) by spreading.
     assessment.generatedReport = { ...report, pdfStatus: "generating" };
     await Store.save(assessment);
     showAssessmentWorkspace();
@@ -744,6 +756,86 @@ function pollFraPdf(assessmentId, attempt = 0) {
 }
 
 /* ============================================================
+   REPORT DETAILS — manual, report-level narrative that is not tied
+   to a single findings section: Executive Summary and Limitations.
+   Persisted inside the findings column (findings.executiveSummary and
+   findings.limitations) so no schema migration is needed. Uses the same
+   debounced auto-save pattern as the Action Plan and Risk Evaluation.
+   These feed the PDF directly and require no AI function to run.
+   ============================================================ */
+let REPORT_DETAILS = { assessment: null, saveTimer: null };
+
+function renderReportDetailsSection(assessment) {
+  const findings = assessment.findings || {};
+  const execSummary = findings.executiveSummary || "";
+  const limitations = findings.limitations || "";
+
+  return `
+    <section class="welcome" id="reportDetailsSection">
+      <div class="save-indicator" id="reportDetailsSaveIndicator"></div>
+      <h2>Report Details</h2>
+      <p>Report-level narrative entered by the assessor. These are included in the PDF and can be typed manually without using the AI.</p>
+
+      <div class="form-group">
+        <label>Executive Summary</label>
+        <textarea
+          id="reportExecSummary"
+          rows="6"
+          oninput="updateReportDetailField('executiveSummary', this.value)"
+          placeholder="A concise summary of the premises, the overall fire risk, and the key findings and actions...">${escapeHtml(execSummary)}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Limitations</label>
+        <textarea
+          id="reportLimitations"
+          rows="5"
+          oninput="updateReportDetailField('limitations', this.value)"
+          placeholder="Record the limitations of the assessment — areas not accessed, visual-only inspection, information relied upon, etc.">${escapeHtml(limitations)}</textarea>
+      </div>
+    </section>`;
+}
+
+async function ensureReportDetailsWorkingCopy() {
+  if (!REPORT_DETAILS.assessment) {
+    REPORT_DETAILS.assessment = await Store.loadCurrent();
+  }
+  if (REPORT_DETAILS.assessment && !REPORT_DETAILS.assessment.findings) {
+    REPORT_DETAILS.assessment.findings = {};
+  }
+  return REPORT_DETAILS.assessment;
+}
+
+async function updateReportDetailField(field, value) {
+  const assessment = await ensureReportDetailsWorkingCopy();
+  if (!assessment) return;
+  if (!assessment.findings) assessment.findings = {};
+  assessment.findings[field] = value;
+  scheduleReportDetailsSave();
+}
+
+function scheduleReportDetailsSave() {
+  const ind = document.getElementById("reportDetailsSaveIndicator");
+  if (ind) { ind.textContent = "Editing…"; ind.className = "save-indicator saving"; }
+  if (REPORT_DETAILS.saveTimer) clearTimeout(REPORT_DETAILS.saveTimer);
+  REPORT_DETAILS.saveTimer = setTimeout(commitReportDetailsSave, 1000);
+}
+
+async function commitReportDetailsSave() {
+  const ind = document.getElementById("reportDetailsSaveIndicator");
+  if (ind) { ind.textContent = "Saving…"; ind.className = "save-indicator saving"; }
+  if (!REPORT_DETAILS.assessment) return;
+  try {
+    const saved = await Store.save(REPORT_DETAILS.assessment);
+    REPORT_DETAILS.assessment.updatedAt = saved.updatedAt;
+    if (ind) { ind.textContent = "Saved ✓"; ind.className = "save-indicator saved"; }
+  } catch (err) {
+    console.error("Report details save failed:", err);
+    if (ind) { ind.textContent = "Save failed — check connection. Your edits are kept on screen."; ind.className = "save-indicator error"; }
+  }
+}
+
+/* ============================================================
    RISK EVALUATION — PAS 79 / HSG65 5-point rating.
    The AI suggests a rating during Generate FRA; the assessor
    reviews, can override likelihood/severity, and confirms.
@@ -777,9 +869,8 @@ function renderRiskEvaluationSection(assessment) {
   const aiSuggestion =
     report.draft && report.draft.riskEvaluation ? report.draft.riskEvaluation : null;
 
-  // Nothing to show until a draft (with a suggestion) exists or a rating is saved.
-  if (!re && !aiSuggestion) return "";
-
+  // The risk evaluation can now always be entered manually. Seed a blank,
+  // unconfirmed evaluation so the section is available without an AI draft.
   if (!re && aiSuggestion) {
     re = {
       likelihood: aiSuggestion.likelihood || "",
@@ -788,6 +879,16 @@ function renderRiskEvaluationSection(assessment) {
       rationale: aiSuggestion.rationale || "",
       reviewPeriod: aiSuggestion.reviewPeriod || "",
       reviewTriggers: aiSuggestion.reviewTriggers || "",
+      confirmed: false
+    };
+  } else if (!re) {
+    re = {
+      likelihood: "",
+      severity: "",
+      rating: "",
+      rationale: "",
+      reviewPeriod: "",
+      reviewTriggers: "",
       confirmed: false
     };
   }
@@ -810,14 +911,14 @@ function renderRiskEvaluationSection(assessment) {
 
   const confirmedBadge = re.confirmed
     ? `<span class="status-badge" style="background:#2e7d32;color:#fff;">Confirmed by assessor</span>`
-    : `<span class="status-badge" style="background:#f9a825;color:#111;">AI-suggested — review &amp; confirm</span>`;
+    : `<span class="status-badge" style="background:#f9a825;color:#111;">Not yet confirmed — review &amp; confirm</span>`;
 
   return `
     <section class="welcome" id="riskEvaluationSection">
       <div class="save-indicator" id="riskSaveIndicator"></div>
       <h2>Overall Risk Evaluation</h2>
       <p>${confirmedBadge}</p>
-      <p style="margin-top:6px;">The overall fire risk rating is determined by the assessor using the risk matrix. The AI provides a starting suggestion; you remain responsible for the final rating.</p>
+      <p style="margin-top:6px;">The overall fire risk rating is determined by the assessor using the risk matrix. You can enter this manually; where an AI draft exists it provides a starting suggestion. You remain responsible for the final rating.</p>
 
       <div class="field-row" style="margin-top:12px;">
         <div class="form-group">
@@ -843,11 +944,10 @@ function renderRiskEvaluationSection(assessment) {
         ${escapeHtml(rating || "Select likelihood and severity")}
       </div>
 
-      ${re.rationale ? `
       <div class="form-group" style="margin-top:14px;">
-        <label>Rationale (AI-suggested — editable)</label>
-        <textarea oninput="updateRiskField('rationale', this.value)">${escapeHtml(re.rationale)}</textarea>
-      </div>` : ""}
+        <label>Rationale</label>
+        <textarea oninput="updateRiskField('rationale', this.value)" placeholder="Explain the basis for the overall rating...">${escapeHtml(re.rationale || "")}</textarea>
+      </div>
 
       <div class="field-row">
         <div class="form-group">
@@ -876,7 +976,7 @@ async function ensureRiskWorkingCopy() {
     RISK.assessment = await Store.loadCurrent();
   }
   if (RISK.assessment && (!RISK.assessment.riskEvaluation || !Object.keys(RISK.assessment.riskEvaluation).length)) {
-    // Seed from the AI suggestion on first edit if not yet saved.
+    // Seed from the AI suggestion on first edit if not yet saved; otherwise blank.
     const sugg =
       RISK.assessment.generatedReport &&
       RISK.assessment.generatedReport.draft &&
@@ -1576,7 +1676,7 @@ function openFindingSection(encodedName) {
     <textarea
       id="sectionDraft"
       oninput="updateSectionDraft('${encodeURIComponent(sectionName)}', this.value)"
-      placeholder="The AI-generated section paragraph will appear here...">${escapeHtml((FRF.assessment.findings?.sectionDrafts?.[sectionName]) || "")}</textarea>
+      placeholder="Type the section assessment here, or use Generate assessment to draft it with AI...">${escapeHtml((FRF.assessment.findings?.sectionDrafts?.[sectionName]) || "")}</textarea>
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
