@@ -203,42 +203,68 @@ exports.handler = async (event) => {
       (assessment.riskEvaluation && assessment.riskEvaluation.rating) || "Not yet rated"
     );
 
+    // ---- Cover page ----
+    // A4 content width between 40pt margins is 515pt. The cover is composed as a
+    // single centred column: the banner is centred as an object (not stretched to
+    // the margins), spacing below it is tightened, and the title + details table
+    // sit as one balanced block. The declaration note is pinned to the page
+    // bottom via an absolutely-positioned element so it always sits at the base.
+    const BANNER_WIDTH = 460; // narrower than the 515 content area => equal side margins
     const cover = [
-      // London & Kent banner strip across the top of the cover, full content width.
-      { image: LK_BANNER, width: 515, margin: [0, 0, 0, 4] },
-      // Thin navy rule under the banner to echo the branded house style.
-      { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1.2, lineColor: LK_NAVY }], margin: [0, 0, 0, 0] },
-      { text: "Fire Risk Assessment", fontSize: 30, bold: true, color: LK_NAVY, alignment: "center", margin: [0, 110, 0, 6] },
-      { text: propName, fontSize: 18, alignment: "center", margin: [0, 0, 0, 2] },
-      addr
-        ? { text: addr, fontSize: 12, color: "#555", alignment: "center", margin: [0, 0, 0, 40] }
-        : { text: "", margin: [0, 0, 0, 40] },
-
-      // Centered details block: a fixed-width table centered on the page.
+      // Banner centred as an object using flexible spacer columns either side.
       {
-        table: {
-          widths: [130, 200],
-          body: [
-            [{ text: "Client", bold: true, color: LK_NAVY }, esc(assessment.clientName)],
-            [{ text: "Assessor", bold: true, color: LK_NAVY }, esc(assessment.assessor)],
-            [{ text: "Assessment date", bold: true, color: LK_NAVY }, esc(assessment.assessmentDate)],
-            [{ text: "Status", bold: true, color: LK_NAVY }, esc(assessment.status)],
-            [{ text: "Reference", bold: true, color: LK_NAVY }, esc(assessment.propertyReference) || "\u2014"],
-            [{ text: "Overall risk rating", bold: true, color: LK_NAVY }, { text: ratingText, bold: true }],
-          ],
-        },
-        layout: {
-          hLineWidth: () => 0,
-          vLineWidth: () => 0,
-          paddingTop: () => 5,
-          paddingBottom: () => 5,
-          paddingLeft: () => 6,
-          paddingRight: () => 6,
-        },
-        alignment: "center",
-        margin: [0, 0, 0, 50],
+        columns: [
+          { width: "*", text: "" },
+          { image: LK_BANNER, width: BANNER_WIDTH },
+          { width: "*", text: "" },
+        ],
+        margin: [0, 0, 0, 0],
       },
 
+      // Title block: measured gap below the banner (was an excessive 150pt),
+      // then the title hierarchy with consistent, relative spacing.
+      { text: "Fire Risk Assessment", fontSize: 32, bold: true, color: LK_NAVY, alignment: "center", margin: [0, 90, 0, 12] },
+      { text: propName, fontSize: 20, color: "#222", alignment: "center", margin: [0, 0, 0, 3] },
+      addr
+        ? { text: addr, fontSize: 12, color: "#777", alignment: "center", margin: [0, 0, 0, 46] }
+        : { text: "", margin: [0, 0, 0, 46] },
+
+      // Centered details block. Flexible spacer columns either side of an
+      // auto-width two-column table centre it on the page (pdfmake table
+      // `alignment` is unreliable, so a columns wrapper is used instead).
+      {
+        columns: [
+          { width: "*", text: "" },
+          {
+            width: "auto",
+            table: {
+              widths: [130, 150],
+              body: [
+                [{ text: "Client", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.clientName), alignment: "left" }],
+                [{ text: "Assessor", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.assessor), alignment: "left" }],
+                [{ text: "Assessment date", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.assessmentDate), alignment: "left" }],
+                [{ text: "Status", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.status), alignment: "left" }],
+                [{ text: "Reference", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.propertyReference) || "\u2014", alignment: "left" }],
+                [{ text: "Overall risk rating", bold: true, color: LK_NAVY, alignment: "right" }, { text: ratingText, bold: true, alignment: "left" }],
+              ],
+            },
+            layout: {
+              hLineWidth: () => 0,
+              vLineWidth: () => 0,
+              paddingTop: () => 7,
+              paddingBottom: () => 7,
+              paddingLeft: () => 10,
+              paddingRight: () => 10,
+            },
+          },
+          { width: "*", text: "" },
+        ],
+        margin: [0, 0, 0, 0],
+      },
+
+      // Declaration note pinned to the bottom of the A4 page (page height 842pt;
+      // placed ~90pt above the base so it clears the bottom margin). Absolute
+      // positioning keeps it anchored regardless of the content height above.
       {
         text: hasAiDraft
           ? "AI-assisted draft for assessor review. The assessor remains responsible for reviewing, editing and approving the final report."
@@ -247,7 +273,8 @@ exports.handler = async (event) => {
         color: "#888",
         fontSize: 9,
         alignment: "center",
-        margin: [60, 0, 60, 0],
+        absolutePosition: { x: 60, y: 752 },
+        width: 475,
       },
       { text: "", pageBreak: "after" },
     ];
