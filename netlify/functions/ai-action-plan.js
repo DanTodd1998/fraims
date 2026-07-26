@@ -133,7 +133,7 @@ Rules:
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Anthropic API error:", data);
+      console.error("Anthropic API error:", JSON.stringify(data));
 
       return {
         statusCode: response.status,
@@ -164,15 +164,21 @@ Rules:
     let actions;
 
     try {
-      const cleanedText = rawText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
+      // Robust extraction: find the JSON array anywhere in the response.
+      // Survives markdown fences, a preamble before the array, or any
+      // trailing text after it, by slicing from the first "[" to the last "]".
+      const firstBracket = rawText.indexOf("[");
+      const lastBracket = rawText.lastIndexOf("]");
 
-      actions = JSON.parse(cleanedText);
+      if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
+        throw new Error("No JSON array found in AI response");
+      }
+
+      const jsonSlice = rawText.slice(firstBracket, lastBracket + 1).trim();
+
+      actions = JSON.parse(jsonSlice);
     } catch (parseError) {
-      console.error("Could not parse action plan JSON:", rawText);
+      console.error("Could not parse action plan JSON. Raw text was:", rawText);
 
       return {
         statusCode: 502,
