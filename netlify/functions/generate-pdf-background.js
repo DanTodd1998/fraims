@@ -1,4 +1,4 @@
-/*
+/*const sharp = require("sharp");
  * Background function: builds a professional FRA PDF from the AI-generated draft,
  * embeds the uploaded photographs, uploads the PDF to Supabase Storage, and writes
  * the download URL back into the assessment's generated_report.pdfUrl.
