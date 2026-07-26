@@ -234,21 +234,19 @@ exports.handler = async (event) => {
     // finishes cleanly after the table.
     const BANNER_WIDTH = 425; // ~82% of the 515pt printable width, centred
     const cover = [
-      // Flexible top spacer: balances the group toward the vertical centre.
-      { text: "", margin: [0, 70, 0, 0] },
-
-      // Banner — widened and horizontally centred as the page header.
+      // Banner — widened and horizontally centred as the page header, sitting
+      // just below the top margin rather than floating down the page.
       {
         columns: [
           { width: "*", text: "" },
           { image: LK_BANNER, width: BANNER_WIDTH },
           { width: "*", text: "" },
         ],
-        margin: [0, 0, 0, 34],
+        margin: [0, 0, 0, 40],
       },
 
       // Title hierarchy: the report title is the clear focal point.
-      { text: "Fire Risk Assessment", fontSize: 34, bold: true, color: LK_NAVY, alignment: "center", characterSpacing: 0.3, margin: [0, 0, 0, 14] },
+      { text: "Fire Risk Assessment", fontSize: 34, bold: true, color: LK_NAVY, alignment: "center", characterSpacing: 0.3, margin: [0, 40, 0, 14] },
       { text: propName, fontSize: 19, color: "#2a2a2a", alignment: "center", margin: [0, 0, 0, 3] },
       addr
         ? { text: addr, fontSize: 12, color: "#777", alignment: "center", margin: [0, 0, 0, 40] }
