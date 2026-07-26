@@ -203,58 +203,81 @@ exports.handler = async (event) => {
       (assessment.riskEvaluation && assessment.riskEvaluation.rating) || "Not yet rated"
     );
 
+    // Format a date as UK long form (e.g. "17 July 2026") for DISPLAY ONLY on the
+    // cover. The stored assessmentDate value is not modified. Falls back to the
+    // original string if it cannot be parsed.
+    const formatUkDate = (value) => {
+      const raw = esc(value);
+      if (!raw) return "";
+      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      let d;
+      if (m) {
+        d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+      } else {
+        const parsed = new Date(raw);
+        if (isNaN(parsed.getTime())) return raw;
+        d = parsed;
+      }
+      if (isNaN(d.getTime())) return raw;
+      const months = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"];
+      return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    };
+    const assessmentDateUk = formatUkDate(assessment.assessmentDate);
+
     // ---- Cover page ----
-    // A4 content width between 40pt margins is 515pt. The cover is composed as a
-    // single centred column: the banner is centred as an object (not stretched to
-    // the margins), spacing below it is tightened, and the title + details table
-    // sit as one balanced block. The declaration note is pinned to the page
-    // bottom via an absolutely-positioned element so it always sits at the base.
-    const BANNER_WIDTH = 460; // narrower than the 515 content area => equal side margins
+    // A4 printable width between 40pt margins is 515pt. The cover is one balanced,
+    // vertically-centred composition: a widened, horizontally-centred banner as the
+    // page header, a tight gap to the title, a strong title hierarchy, and the
+    // details table centred beneath. A single flexible top spacer lifts the whole
+    // group toward the optical centre without hard-coded pixel offsets. The cover
+    // finishes cleanly after the table.
+    const BANNER_WIDTH = 425; // ~82% of the 515pt printable width, centred
     const cover = [
-      // Banner centred as an object using flexible spacer columns either side.
+      // Flexible top spacer: balances the group toward the vertical centre.
+      { text: "", margin: [0, 70, 0, 0] },
+
+      // Banner — widened and horizontally centred as the page header.
       {
         columns: [
           { width: "*", text: "" },
           { image: LK_BANNER, width: BANNER_WIDTH },
           { width: "*", text: "" },
         ],
-        margin: [0, 0, 0, 0],
+        margin: [0, 0, 0, 34],
       },
 
-      // Title block: measured gap below the banner (was an excessive 150pt),
-      // then the title hierarchy with consistent, relative spacing.
-      { text: "Fire Risk Assessment", fontSize: 32, bold: true, color: LK_NAVY, alignment: "center", margin: [0, 90, 0, 12] },
-      { text: propName, fontSize: 20, color: "#222", alignment: "center", margin: [0, 0, 0, 3] },
+      // Title hierarchy: the report title is the clear focal point.
+      { text: "Fire Risk Assessment", fontSize: 34, bold: true, color: LK_NAVY, alignment: "center", characterSpacing: 0.3, margin: [0, 0, 0, 14] },
+      { text: propName, fontSize: 19, color: "#2a2a2a", alignment: "center", margin: [0, 0, 0, 3] },
       addr
-        ? { text: addr, fontSize: 12, color: "#777", alignment: "center", margin: [0, 0, 0, 46] }
-        : { text: "", margin: [0, 0, 0, 46] },
+        ? { text: addr, fontSize: 12, color: "#777", alignment: "center", margin: [0, 0, 0, 40] }
+        : { text: "", margin: [0, 0, 0, 40] },
 
-      // Centered details block. Flexible spacer columns either side of an
-      // auto-width two-column table centre it on the page (pdfmake table
-      // `alignment` is unreliable, so a columns wrapper is used instead).
+      // Details table — centred beneath the title, evenly typeset, no colour badge.
       {
         columns: [
           { width: "*", text: "" },
           {
             width: "auto",
             table: {
-              widths: [130, 150],
+              widths: [140, 160],
               body: [
-                [{ text: "Client", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.clientName), alignment: "left" }],
-                [{ text: "Assessor", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.assessor), alignment: "left" }],
-                [{ text: "Assessment date", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.assessmentDate), alignment: "left" }],
-                [{ text: "Status", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.status), alignment: "left" }],
-                [{ text: "Reference", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.propertyReference) || "\u2014", alignment: "left" }],
-                [{ text: "Overall risk rating", bold: true, color: LK_NAVY, alignment: "right" }, { text: ratingText, bold: true, alignment: "left" }],
+                [{ text: "Client", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.clientName), color: "#2a2a2a", alignment: "left" }],
+                [{ text: "Assessor", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.assessor), color: "#2a2a2a", alignment: "left" }],
+                [{ text: "Assessment date", bold: true, color: LK_NAVY, alignment: "right" }, { text: assessmentDateUk, color: "#2a2a2a", alignment: "left" }],
+                [{ text: "Status", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.status), color: "#2a2a2a", alignment: "left" }],
+                [{ text: "Reference", bold: true, color: LK_NAVY, alignment: "right" }, { text: esc(assessment.propertyReference) || "\u2014", color: "#2a2a2a", alignment: "left" }],
+                [{ text: "Overall risk rating", bold: true, color: LK_NAVY, alignment: "right" }, { text: ratingText, bold: true, color: LK_NAVY, alignment: "left" }],
               ],
             },
             layout: {
               hLineWidth: () => 0,
               vLineWidth: () => 0,
-              paddingTop: () => 7,
-              paddingBottom: () => 7,
-              paddingLeft: () => 10,
-              paddingRight: () => 10,
+              paddingTop: () => 8,
+              paddingBottom: () => 8,
+              paddingLeft: () => 12,
+              paddingRight: () => 12,
             },
           },
           { width: "*", text: "" },
@@ -262,20 +285,6 @@ exports.handler = async (event) => {
         margin: [0, 0, 0, 0],
       },
 
-      // Declaration note pinned to the bottom of the A4 page (page height 842pt;
-      // placed ~90pt above the base so it clears the bottom margin). Absolute
-      // positioning keeps it anchored regardless of the content height above.
-      {
-        text: hasAiDraft
-          ? "AI-assisted draft for assessor review. The assessor remains responsible for reviewing, editing and approving the final report."
-          : "Prepared by the assessor. The assessor remains responsible for the content and approval of this report.",
-        italics: true,
-        color: "#888",
-        fontSize: 9,
-        alignment: "center",
-        absolutePosition: { x: 60, y: 752 },
-        width: 475,
-      },
       { text: "", pageBreak: "after" },
     ];
 
