@@ -86,37 +86,68 @@ async function patchReport(assessmentId, patch) {
 // or null on failure.
 //
 // The original Supabase file is never modified - this only produces a temporary,
-// downscaled in-memory copy for embedding in the PDF:
-//   • longest edge <= 1600px (aspect ratio preserved, never enlarged)
-//   • auto-rotated from EXIF, then orientation metadata stripped
-//   • re-encoded as JPEG quality 80 (mozjpeg), other metadata stripped
-//
-// This keeps the PDF well under the Supabase Storage object-size limit while
-// keeping fire-safety evidence (door gaps, signage, defects, labels) legible.
+// downscaled in-memory copy for embedding in the PDF. If the resize step fails
+// for any reason, we fall back to the original bytes (still JPEG/PNG) so the
+// photo still appears, and we log the real reason.
 async function fetchImageDataUrl(url) {
+  let inputBuffer;
+  let contentType = "";
+
+  // Step 1: fetch the original bytes.
   try {
     const res = await fetch(url);
     if (!res.ok) {
       console.warn("Image fetch failed:", res.status, url);
       return null;
     }
+    contentType = (res.headers.get("content-type") || "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    inputBuffer = Buffer.from(await res.arrayBuffer());
+    if (!inputBuffer || inputBuffer.length === 0) {
+      console.warn("Image fetch returned empty body:", url);
+      return null;
+    }
+  } catch (e) {
+    console.warn("Image fetch error:", e.message, url);
+    return null;
+  }
 
-    const inputBuffer = Buffer.from(await res.arrayBuffer());
-
+  // Step 2: try to resize/compress with sharp. Aggressive settings are fine -
+  // fire-safety evidence only needs to be legible.
+  try {
     const outputBuffer = await sharp(inputBuffer)
-      .rotate() // auto-orient from EXIF, then metadata is dropped on encode
-      .resize(1600, 1600, {
+      .rotate()
+      .resize(1400, 1400, {
         fit: "inside",
         withoutEnlargement: true,
       })
-      .jpeg({ quality: 80, mozjpeg: true })
+      .jpeg({ quality: 70, mozjpeg: true })
       .toBuffer();
 
-    // pdfmake supports JPEG (and PNG); we always output JPEG here.
     return `data:image/jpeg;base64,${outputBuffer.toString("base64")}`;
-  } catch (e) {
-    console.warn("Image optimise/fetch error:", e.message, url);
-    return null;
+  } catch (sharpErr) {
+    // Resize failed - log the real reason and fall back to the original bytes
+    // so the photo still appears in the PDF.
+    console.warn("Sharp resize failed, falling back to original:", sharpErr.message, url);
+
+    // pdfmake only supports JPEG and PNG. Determine the media type.
+    let mediaType = "";
+    if (contentType === "image/jpeg" || contentType === "image/png") {
+      mediaType = contentType;
+    } else if (/\.jpe?g($|\?)/i.test(url)) {
+      mediaType = "image/jpeg";
+    } else if (/\.png($|\?)/i.test(url)) {
+      mediaType = "image/png";
+    }
+
+    if (!mediaType) {
+      console.warn("Unsupported image type and resize failed:", contentType, url);
+      return null;
+    }
+
+    return `data:${mediaType};base64,${inputBuffer.toString("base64")}`;
   }
 }
 
