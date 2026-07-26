@@ -1,3 +1,5 @@
+const sharp = require("sharp");
+
 /*
  * Background function: generates a full draft FRA with Claude, then writes the
  * result back into the assessment's generated_report field in Supabase.
@@ -41,6 +43,48 @@ async function writeReport(assessmentId, report) {
     console.error("Failed to write report to Supabase:", res.status, detail);
   } else {
     console.log("Report written to assessment:", assessmentId);
+  }
+}
+
+/*
+ * Fetch a photo from its Supabase URL and return an optimised base64 JPEG
+ * suitable for sending to Anthropic as evidence.
+ *
+ * The original Supabase file is never modified — this only produces a
+ * temporary, downscaled in-memory copy for the AI request:
+ *   • longest edge <= 1600px (aspect ratio preserved, never enlarged)
+ *   • auto-rotated from EXIF, then orientation metadata stripped
+ *   • re-encoded as JPEG quality 72 (mozjpeg), other metadata stripped
+ *
+ * Returns { data, mediaType } on success, or null if the photo could not be
+ * fetched or processed (the caller then skips that photo).
+ */
+async function fetchAndOptimise(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("Could not download photo:", res.status, url);
+      return null;
+    }
+
+    const inputBuffer = Buffer.from(await res.arrayBuffer());
+
+    const outputBuffer = await sharp(inputBuffer)
+      .rotate() // auto-orient from EXIF, then metadata is dropped on encode
+      .resize(1600, 1600, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 72, mozjpeg: true })
+      .toBuffer();
+
+    return {
+      data: outputBuffer.toString("base64"),
+      mediaType: "image/jpeg",
+    };
+  } catch (err) {
+    console.warn("Could not optimise photo:", url, err.message);
+    return null;
   }
 }
 
@@ -113,7 +157,7 @@ Original filename: ${photo.name || "Unknown"}`,
 
         photoContent.push({
           type: "image",
-          source: { type: "url", url: photo.url },
+          __photoUrl: photo.url,
         });
       });
     });
@@ -139,7 +183,7 @@ Original filename: ${photo.name || "Unknown"}`,
 
         photoContent.push({
           type: "image",
-          source: { type: "url", url: photo.url },
+          __photoUrl: photo.url,
         });
       });
     });
@@ -219,6 +263,39 @@ Complete assessment information:
 ${JSON.stringify(assessment, null, 2)}
 `.trim();
 
+    // Optimise every marked image (fetch from Supabase, downscale, base64).
+    // Images that fail to process are dropped, along with their caption block.
+    const optimisedContent = [];
+    for (const block of photoContent) {
+      if (block.type === "image" && block.__photoUrl) {
+        const optimised = await fetchAndOptimise(block.__photoUrl);
+        if (optimised) {
+          optimisedContent.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: optimised.mediaType,
+              data: optimised.data,
+            },
+          });
+        } else {
+          // Drop the caption text block that immediately preceded this image
+          // so we don't reference a photo that isn't there.
+          if (
+            optimisedContent.length > 0 &&
+            optimisedContent[optimisedContent.length - 1].type === "text"
+          ) {
+            optimisedContent.pop();
+          }
+        }
+      } else {
+        optimisedContent.push(block);
+      }
+    }
+
+    const imageCount = optimisedContent.filter((b) => b.type === "image").length;
+    console.log("Optimised images sent to Anthropic:", imageCount);
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -234,7 +311,7 @@ ${JSON.stringify(assessment, null, 2)}
             role: "user",
             content: [
               { type: "text", text: reportRequest },
-              ...photoContent,
+              ...optimisedContent,
             ],
           },
         ],
@@ -319,7 +396,7 @@ ${JSON.stringify(assessment, null, 2)}
     await writeReport(assessment.id, {
       status: "ready",
       draft,
-      photoCount: photoContent.filter((item) => item.type === "image").length,
+      photoCount: imageCount,
       updatedAt: new Date().toISOString(),
     });
 
