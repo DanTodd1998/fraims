@@ -232,18 +232,18 @@ exports.handler = async (event) => {
     // details table centred beneath. A single flexible top spacer lifts the whole
     // group toward the optical centre without hard-coded pixel offsets. The cover
     // finishes cleanly after the table.
-    const BANNER_WIDTH = 475; // ~92% of the 515pt printable width, centred
+    const BANNER_WIDTH = 500; // ~97% of the 515pt printable width, centred
     const cover = [
       // Banner — widened and horizontally centred as the page header. A negative
-      // top margin lifts it nearer the top edge on the cover only; global page
-      // margins (and therefore all other pages) are unchanged.
+      // top margin lifts it close to the top edge on the cover; because page
+      // margins are the original fixed array, all other pages are unaffected.
       {
         columns: [
           { width: "*", text: "" },
           { image: LK_BANNER, width: BANNER_WIDTH },
           { width: "*", text: "" },
         ],
-        margin: [0, -32, 0, 40],
+        margin: [0, -35, 0, 44],
       },
 
       // Title hierarchy: the report title is the clear focal point.
