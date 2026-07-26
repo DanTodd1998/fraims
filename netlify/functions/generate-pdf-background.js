@@ -82,7 +82,17 @@ async function patchReport(assessmentId, patch) {
   }
 }
 
-// Fetch an image URL and return a pdfmake-ready data URL, or null on failure.
+// Fetch an image URL, downscale/compress it, and return a pdfmake-ready data URL,
+// or null on failure.
+//
+// The original Supabase file is never modified - this only produces a temporary,
+// downscaled in-memory copy for embedding in the PDF:
+//   • longest edge <= 1600px (aspect ratio preserved, never enlarged)
+//   • auto-rotated from EXIF, then orientation metadata stripped
+//   • re-encoded as JPEG quality 80 (mozjpeg), other metadata stripped
+//
+// This keeps the PDF well under the Supabase Storage object-size limit while
+// keeping fire-safety evidence (door gaps, signage, defects, labels) legible.
 async function fetchImageDataUrl(url) {
   try {
     const res = await fetch(url);
@@ -90,22 +100,22 @@ async function fetchImageDataUrl(url) {
       console.warn("Image fetch failed:", res.status, url);
       return null;
     }
-    const ct = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    const supported = ["image/jpeg", "image/png"];
-    // pdfmake supports JPEG and PNG only.
-    let mediaType = supported.includes(ct) ? ct : "";
-    if (!mediaType) {
-      if (/\.jpe?g($|\?)/i.test(url)) mediaType = "image/jpeg";
-      else if (/\.png($|\?)/i.test(url)) mediaType = "image/png";
-    }
-    if (!mediaType) {
-      console.warn("Unsupported image type for PDF (need jpeg/png):", ct, url);
-      return null;
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    return `data:${mediaType};base64,${buf.toString("base64")}`;
+
+    const inputBuffer = Buffer.from(await res.arrayBuffer());
+
+    const outputBuffer = await sharp(inputBuffer)
+      .rotate() // auto-orient from EXIF, then metadata is dropped on encode
+      .resize(1600, 1600, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+
+    // pdfmake supports JPEG (and PNG); we always output JPEG here.
+    return `data:image/jpeg;base64,${outputBuffer.toString("base64")}`;
   } catch (e) {
-    console.warn("Image fetch error:", e.message, url);
+    console.warn("Image optimise/fetch error:", e.message, url);
     return null;
   }
 }
