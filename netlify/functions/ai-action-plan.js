@@ -119,7 +119,7 @@ Rules:
         },
         body: JSON.stringify({
           model: "claude-sonnet-5",
-          max_tokens: 2500,
+          max_tokens: 8000,
           messages: [
             {
               role: "user",
@@ -151,12 +151,40 @@ Rules:
       .join("\n")
       .trim();
 
+    // Diagnostics requested: stop_reason, usage, length, closing bracket.
+    console.log("Action plan diagnostics:", JSON.stringify({
+      stop_reason: data.stop_reason,
+      usage: data.usage,
+      rawTextLength: rawText.length,
+      endsWithClosingBracket: rawText.trimEnd().endsWith("]"),
+      last80: rawText.slice(-80),
+    }));
+
     if (!rawText) {
       return {
         statusCode: 502,
         headers: jsonHeaders,
         body: JSON.stringify({
           error: "AI returned an empty response",
+        }),
+      };
+    }
+
+    // If the model hit the token ceiling, the JSON array is truncated and
+    // cannot be parsed. Return a clear, specific truncation error rather than
+    // a generic "invalid data" message.
+    if (data.stop_reason === "max_tokens") {
+      console.error("Action plan truncated: stop_reason was max_tokens.");
+
+      return {
+        statusCode: 502,
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          error:
+            "The action plan was too long and was cut off before completion. " +
+            "Please try again, or reduce the amount of assessment detail.",
+          stop_reason: data.stop_reason,
+          usage: data.usage,
         }),
       };
     }
