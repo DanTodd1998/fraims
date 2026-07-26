@@ -83,17 +83,12 @@ async function patchReport(assessmentId, patch) {
 }
 
 // Fetch an image URL, downscale/compress it, and return a pdfmake-ready data URL,
-// or null on failure.
-//
-// The original Supabase file is never modified - this only produces a temporary,
-// downscaled in-memory copy for embedding in the PDF. If the resize step fails
-// for any reason, we fall back to the original bytes (still JPEG/PNG) so the
-// photo still appears, and we log the real reason.
+// or null on failure. On ANY failure the photo is skipped (never embedded at
+// full size), so the PDF stays small enough to upload.
 async function fetchImageDataUrl(url) {
   let inputBuffer;
   let contentType = "";
 
-  // Step 1: fetch the original bytes.
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -105,6 +100,18 @@ async function fetchImageDataUrl(url) {
       .trim()
       .toLowerCase();
     inputBuffer = Buffer.from(await res.arrayBuffer());
+
+    // Diagnostic: what did we actually receive?
+    console.log(
+      "Image fetched:",
+      JSON.stringify({
+        url,
+        contentType,
+        bytes: inputBuffer ? inputBuffer.length : 0,
+        firstBytesHex: inputBuffer ? inputBuffer.slice(0, 4).toString("hex") : "",
+      })
+    );
+
     if (!inputBuffer || inputBuffer.length === 0) {
       console.warn("Image fetch returned empty body:", url);
       return null;
@@ -114,40 +121,27 @@ async function fetchImageDataUrl(url) {
     return null;
   }
 
-  // Step 2: try to resize/compress with sharp. Aggressive settings are fine -
-  // fire-safety evidence only needs to be legible.
   try {
     const outputBuffer = await sharp(inputBuffer)
       .rotate()
-      .resize(1400, 1400, {
+      .resize(1200, 1200, {
         fit: "inside",
         withoutEnlargement: true,
       })
-      .jpeg({ quality: 70, mozjpeg: true })
+      .jpeg({ quality: 65, mozjpeg: true })
       .toBuffer();
+
+    console.log(
+      "Image optimised:",
+      JSON.stringify({ url, outBytes: outputBuffer.length })
+    );
 
     return `data:image/jpeg;base64,${outputBuffer.toString("base64")}`;
   } catch (sharpErr) {
-    // Resize failed - log the real reason and fall back to the original bytes
-    // so the photo still appears in the PDF.
-    console.warn("Sharp resize failed, falling back to original:", sharpErr.message, url);
-
-    // pdfmake only supports JPEG and PNG. Determine the media type.
-    let mediaType = "";
-    if (contentType === "image/jpeg" || contentType === "image/png") {
-      mediaType = contentType;
-    } else if (/\.jpe?g($|\?)/i.test(url)) {
-      mediaType = "image/jpeg";
-    } else if (/\.png($|\?)/i.test(url)) {
-      mediaType = "image/png";
-    }
-
-    if (!mediaType) {
-      console.warn("Unsupported image type and resize failed:", contentType, url);
-      return null;
-    }
-
-    return `data:${mediaType};base64,${inputBuffer.toString("base64")}`;
+    // Do NOT fall back to the original bytes - that reintroduces the 413.
+    // Skip the photo instead.
+    console.warn("Sharp resize failed, skipping photo:", sharpErr.message, url);
+    return null;
   }
 }
 
