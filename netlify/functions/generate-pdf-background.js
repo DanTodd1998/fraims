@@ -440,6 +440,7 @@ exports.handler = async (event) => {
     if (realPhotos.length) {
       appendixContent.push({ text: "Photograph Appendix", fontSize: 14, bold: true, color: LK_NAVY, margin: [0, 16, 0, 8], pageBreak: "before" });
 
+      const sectionPhotoCounts = {};
       for (const rp of realPhotos) {
         const dataUrl = await fetchImageDataUrl(rp.url);
         const ai = aiById[rp.id.toUpperCase()] || null;
@@ -447,8 +448,15 @@ exports.handler = async (event) => {
           ? `${ai.caption ? String(ai.caption) : ""}${ai.observation ? " " + String(ai.observation) : ""}`.trim()
           : "";
 
-        appendixContent.push({ text: `${rp.id} \u2014 ${rp.label}`, bold: true, fontSize: 10, margin: [0, 8, 0, 4] });
-        if (dataUrl) {
+const sectionKey = rp.label || "Photograph";
+        sectionPhotoCounts[sectionKey] = (sectionPhotoCounts[sectionKey] || 0) + 1;
+        const sectionPhotoNumber = sectionPhotoCounts[sectionKey];
+        appendixContent.push({
+          text: `${rp.label} \u2014 Photograph ${sectionPhotoNumber}`,
+          bold: true,
+          fontSize: 10,
+          margin: [0, 8, 0, 4]
+        });        if (dataUrl) {
           appendixContent.push({ image: dataUrl, fit: [380, 300], margin: [0, 0, 0, 4] });
         } else {
           appendixContent.push({ text: "[Photograph could not be embedded]", italics: true, color: "#999", fontSize: 9 });
