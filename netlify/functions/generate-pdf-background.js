@@ -493,8 +493,7 @@ const sectionKey = rp.label || "Photograph";
         riskContent.push({ text: esc(re.rationale), fontSize: 10, lineHeight: 1.3, margin: [0, 0, 0, 6] });
       }
       riskContent.push({
-        text: "The overall risk rating is determined by the assessor using a PAS 79 / HSG65 risk matrix.",
-        italics: true, color: "#666", fontSize: 9,
+text: "The overall risk rating is determined by the assessor using the risk-evaluation matrix set out in this report.",        italics: true, color: "#666", fontSize: 9,
       });
     }
 
