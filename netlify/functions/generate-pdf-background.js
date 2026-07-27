@@ -1,3 +1,4 @@
+const sharp = require("sharp");
 /*const sharp = require("sharp");
  * Background function: builds a professional FRA PDF from the AI-generated draft,
  * embeds the uploaded photographs, uploads the PDF to Supabase Storage, and writes
