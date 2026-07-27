@@ -845,7 +845,8 @@ const RISK_LIKELIHOODS = ["Low", "Medium", "High"];
 const RISK_SEVERITIES = ["Slight harm", "Moderate harm", "Extreme harm"];
 const RISK_RATINGS = ["Trivial", "Tolerable", "Moderate", "Substantial", "Intolerable"];
 
-// Risk-evaluation matrix: likelihood (row) x severity (col) -> rating.function riskMatrixRating(likelihood, severity) {
+// Risk-evaluation matrix: likelihood (row) x severity (col) -> rating.
+function riskMatrixRating(likelihood, severity) {
   const L = RISK_LIKELIHOODS.indexOf(likelihood);
   const S = RISK_SEVERITIES.indexOf(severity);
   if (L === -1 || S === -1) return "";
