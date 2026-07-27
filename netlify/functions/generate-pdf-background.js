@@ -1,4 +1,4 @@
-const sharp = require("sharp");
+﻿const sharp = require("sharp");
 /*const sharp = require("sharp");
  * Background function: builds a professional FRA PDF from the AI-generated draft,
  * embeds the uploaded photographs, uploads the PDF to Supabase Storage, and writes
@@ -270,7 +270,7 @@ exports.handler = async (event) => {
     // finishes cleanly after the table.
     const BANNER_WIDTH = 500; // ~97% of the 515pt printable width, centred
     const cover = [
-      // Banner — widened and horizontally centred as the page header. A negative
+      // Banner â€” widened and horizontally centred as the page header. A negative
       // top margin lifts it close to the top edge on the cover; because page
       // margins are the original fixed array, all other pages are unaffected.
       {
@@ -289,7 +289,7 @@ exports.handler = async (event) => {
         ? { text: addr, fontSize: 12, color: "#777", alignment: "center", margin: [0, 0, 0, 40] }
         : { text: "", margin: [0, 0, 0, 40] },
 
-      // Details table — centred beneath the title, evenly typeset, no colour badge.
+      // Details table â€” centred beneath the title, evenly typeset, no colour badge.
       {
         columns: [
           { width: "*", text: "" },
@@ -487,6 +487,52 @@ const sectionKey = rp.label || "Photograph";
         layout: "lightHorizontalLines",
         fontSize: 10,
         margin: [0, 0, 0, 8],
+      });
+      // Risk-evaluation matrix: highlight the assessor's selected cell.
+      const mxLikelihoods = ["Low", "Medium", "High"];
+      const mxSeverities = ["Slight harm", "Moderate harm", "Extreme harm"];
+      const mxGrid = [
+        ["Trivial", "Tolerable", "Moderate"],
+        ["Tolerable", "Moderate", "Substantial"],
+        ["Moderate", "Substantial", "Intolerable"],
+      ];
+      const mxSelL = mxLikelihoods.indexOf(esc(re.likelihood));
+      const mxSelS = mxSeverities.indexOf(esc(re.severity));
+      const mxBandColour = {
+        Trivial: "#2e7d32", Tolerable: "#558b2f", Moderate: "#f9a825",
+        Substantial: "#ef6c00", Intolerable: "#c62828",
+      };
+      const mxHeader = [
+        { text: "Likelihood \\ Severity", bold: true, fontSize: 8, fillColor: LK_NAVY, color: "#ffffff" },
+        ...mxSeverities.map((s) => ({ text: s, bold: true, fontSize: 8, alignment: "center", fillColor: LK_NAVY, color: "#ffffff" })),
+      ];
+      const mxBody = [mxHeader];
+      mxGrid.forEach((row, li) => {
+        const cells = [
+          { text: mxLikelihoods[li], bold: true, fontSize: 8, fillColor: LK_NAVY, color: "#ffffff" },
+        ];
+        row.forEach((band, si) => {
+          const isSel = li === mxSelL && si === mxSelS;
+          cells.push({
+            text: band + (isSel ? "  \u25C0" : ""),
+            fontSize: 8,
+            alignment: "center",
+            bold: isSel,
+            color: isSel ? "#ffffff" : "#333333",
+            fillColor: isSel ? (mxBandColour[band] || "#ef6c00") : "#f5f5f5",
+          });
+        });
+        mxBody.push(cells);
+      });
+      riskContent.push({ text: "Risk-evaluation matrix", bold: true, fontSize: 11, margin: [0, 10, 0, 4] });
+      riskContent.push({
+        table: { headerRows: 1, widths: ["*", "*", "*", "*"], body: mxBody },
+        layout: {
+          hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+          hLineColor: () => "#dddddd", vLineColor: () => "#dddddd",
+          paddingTop: () => 4, paddingBottom: () => 4, paddingLeft: () => 5, paddingRight: () => 5,
+        },
+        margin: [0, 0, 0, 6],
       });
       if (re.rationale) {
         riskContent.push({ text: "Rationale", bold: true, fontSize: 11, margin: [0, 6, 0, 2] });
