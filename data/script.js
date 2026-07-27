@@ -1344,7 +1344,46 @@ async function uploadSectionPhotos(encodedSectionName) {
         .from(PHOTO_BUCKET)
         .getPublicUrl(path);
 
+      // Duplicate guard: timestamped paths/URLs always differ on re-upload,
+      // so compare on original filename within THIS section only.
+      const thisSection = assessment.photos.sectionPhotos[sectionName];
+      const alreadyInSection = thisSection.some(
+        (p) => p && p.name === file.name
+      );
+
+      // Warn (do not block) if the same filename already exists elsewhere,
+      // since the same photo legitimately may belong to more than one section.
+      const sectionsWithSameName = Object.keys(
+        assessment.photos.sectionPhotos
+      ).filter(
+        (key) =>
+          key !== sectionName &&
+          (assessment.photos.sectionPhotos[key] || []).some(
+            (p) => p && p.name === file.name
+          )
+      );
+
+      if (alreadyInSection) {
+        const proceed = confirm(
+          `"${file.name}" is already in this section (${sectionName}). ` +
+            `Add it again anyway?`
+        );
+        if (!proceed) {
+          // Remove the just-uploaded storage object so we don't orphan it.
+          await supabaseClient.storage.from(PHOTO_BUCKET).remove([path]);
+          continue;
+        }
+      } else if (sectionsWithSameName.length) {
+        // Not blocking — just make the assessor aware.
+        confirm(
+          `Note: "${file.name}" is also used in: ` +
+            `${sectionsWithSameName.join(", ")}. ` +
+            `It will still be added to ${sectionName}.`
+        );
+      }
+
       assessment.photos.sectionPhotos[sectionName].push({
+        section: sectionName,
         path,
         url: urlData.publicUrl,
         name: file.name,
